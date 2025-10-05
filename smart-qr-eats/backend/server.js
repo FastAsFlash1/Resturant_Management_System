@@ -2,7 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
-// const { sequelize } = require('./config/database');
+const connectDB = require('./config/database');
 
 const app = express();
 
@@ -18,26 +18,12 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 // Serve static files
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// Connect to PostgreSQL - COMMENTED OUT FOR NOW
-// const connectDB = async () => {
-//   try {
-//     await sequelize.authenticate();
-//     console.log('PostgreSQL Connection has been established successfully.');
-    
-//     // Sync database (create tables if they don't exist)
-//     await sequelize.sync({ alter: true });
-//     console.log('Database synchronized successfully.');
-//   } catch (error) {
-//     console.error('Unable to connect to the database:', error);
-//     process.exit(1);
-//   }
-// };
-
-// connectDB();
+// Connect to MongoDB
+connectDB();
 
 // Routes
 app.use('/api/auth', require('./routes/auth'));
-// app.use('/api/admin', require('./routes/admin')); // Commented out - requires database
+app.use('/api/admin', require('./routes/admin'));
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
@@ -73,5 +59,5 @@ const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`FastAsFlash API server running on port ${PORT}`);
   console.log(`Environment: ${process.env.NODE_ENV}`);
-  console.log(`Database: ${process.env.DB_HOST}:${process.env.DB_PORT}/${process.env.DB_NAME}`);
+  console.log(`MongoDB URI: ${process.env.MONGO_URI}`);
 });

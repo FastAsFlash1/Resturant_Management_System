@@ -59,17 +59,14 @@ router.put('/update-username', auth, async (req, res) => {
     }
 
     // Update owner name
-    const [updatedRowsCount] = await Restaurant.update({
-      ownerName: ownerName.trim(),
-      updatedAt: new Date()
-    }, {
-      where: { id: req.restaurant.id },
-      returning: true
-    });
-
-    const restaurant = await Restaurant.findByPk(req.restaurant.id, {
-      attributes: { exclude: ['hashedPassword'] }
-    });
+    const restaurant = await Restaurant.findByIdAndUpdate(
+      req.restaurant._id,
+      { 
+        ownerName: ownerName.trim(),
+        updatedAt: new Date()
+      },
+      { new: true, runValidators: true }
+    ).select('-hashedPassword');
 
     res.json({
       success: true,
@@ -82,8 +79,8 @@ router.put('/update-username', auth, async (req, res) => {
   } catch (error) {
     console.error('Update username error:', error);
     
-    if (error.name === 'SequelizeValidationError') {
-      const errors = error.errors.map(err => err.message);
+    if (error.name === 'ValidationError') {
+      const errors = Object.values(error.errors).map(err => err.message);
       return res.status(400).json({
         success: false,
         message: 'Validation failed',
@@ -121,7 +118,7 @@ router.put('/change-password', auth, async (req, res) => {
     }
 
     // Get restaurant with password
-    const restaurant = await Restaurant.findByPk(req.restaurant.id);
+    const restaurant = await Restaurant.findById(req.restaurant._id);
 
     // Verify current password
     const isCurrentPasswordValid = await bcrypt.compare(currentPassword, restaurant.hashedPassword);
@@ -218,13 +215,11 @@ router.put('/update-profile', auth, async (req, res) => {
     updateData.updatedAt = new Date();
 
     // Update restaurant
-    await Restaurant.update(updateData, {
-      where: { id: req.restaurant.id }
-    });
-
-    const restaurant = await Restaurant.findByPk(req.restaurant.id, {
-      attributes: { exclude: ['hashedPassword'] }
-    });
+    const restaurant = await Restaurant.findByIdAndUpdate(
+      req.restaurant._id,
+      updateData,
+      { new: true, runValidators: true }
+    ).select('-hashedPassword');
 
     res.json({
       success: true,
@@ -239,8 +234,8 @@ router.put('/update-profile', auth, async (req, res) => {
   } catch (error) {
     console.error('Update profile error:', error);
     
-    if (error.name === 'SequelizeValidationError') {
-      const errors = error.errors.map(err => err.message);
+    if (error.name === 'ValidationError') {
+      const errors = Object.values(error.errors).map(err => err.message);
       return res.status(400).json({
         success: false,
         message: 'Validation failed',

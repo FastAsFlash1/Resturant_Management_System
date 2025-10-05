@@ -1,37 +1,22 @@
-const { Sequelize } = require('sequelize');
-require('dotenv').config();
+const mongoose = require('mongoose');
 
-const sequelize = new Sequelize({
-  host: process.env.DB_HOST || 'localhost',
-  port: process.env.DB_PORT || 5432,
-  database: process.env.DB_NAME || 'fastasflash',
-  username: process.env.DB_USER || 'postgres',
-  password: process.env.DB_PASSWORD || 'password',
-  dialect: process.env.DB_DIALECT || 'postgres',
-  logging: process.env.NODE_ENV === 'development' ? console.log : false,
-  pool: {
-    max: 5,
-    min: 0,
-    acquire: 30000,
-    idle: 10000
-  },
-  define: {
-    freezeTableName: true,
-    timestamps: true,
-    underscored: false
-  }
-});
-
-// Test the connection
-const testConnection = async () => {
+// MongoDB connection function
+const connectDB = async () => {
   try {
-    await sequelize.authenticate();
-    console.log('PostgreSQL connection established successfully.');
+    // Use the MongoDB URI from environment variables
+    const mongoURI = process.env.MONGO_URI || 'mongodb+srv://sourabhupadhyay899_db_user:3VdIN0egbftOPKJ2@resutrant.pypxv8g.mongodb.net/fastasflash?retryWrites=true&w=majority&appName=Resutrant';
+    
+    console.log('Connecting to MongoDB Atlas...');
+    const conn = await mongoose.connect(mongoURI, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+    });
+    console.log(`✅ MongoDB Connected Successfully: ${conn.connection.host}`);
+    console.log(`📊 Database: ${conn.connection.name}`);
   } catch (error) {
-    console.error('Unable to connect to PostgreSQL database:', error.message);
+    console.error('❌ Database connection error:', error.message);
     process.exit(1);
   }
 };
 
-// Export the sequelize instance and DataTypes
-module.exports = { sequelize, DataTypes: Sequelize.DataTypes };
+module.exports = connectDB;

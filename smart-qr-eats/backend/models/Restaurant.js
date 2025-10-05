@@ -1,149 +1,154 @@
-const { sequelize, DataTypes } = require('../config/database');
+const mongoose = require('mongoose');
 const validator = require('validator');
 
-const Restaurant = sequelize.define('Restaurant', {
-  id: {
-    type: DataTypes.UUID,
-    defaultValue: DataTypes.UUIDV4,
-    primaryKey: true
-  },
+const restaurantSchema = new mongoose.Schema({
   restaurantId: {
-    type: DataTypes.STRING(20),
+    type: String,
+    required: [true, 'Restaurant ID is required'],
     unique: true,
-    allowNull: false,
-    validate: {
-      notEmpty: {
-        msg: 'Restaurant ID is required'
-      },
-      len: {
-        args: [3, 20],
-        msg: 'Restaurant ID must be between 3 and 20 characters'
-      }
-    }
+    trim: true,
+    minlength: [6, 'Restaurant ID must be at least 6 characters'],
+    maxlength: [20, 'Restaurant ID cannot exceed 20 characters']
   },
   restaurantName: {
-    type: DataTypes.STRING(100),
-    allowNull: false,
-    validate: {
-      notEmpty: {
-        msg: 'Restaurant name is required'
-      },
-      len: {
-        args: [1, 100],
-        msg: 'Restaurant name cannot exceed 100 characters'
-      }
-    }
+    type: String,
+    required: [true, 'Restaurant name is required'],
+    trim: true,
+    minlength: [2, 'Restaurant name must be at least 2 characters'],
+    maxlength: [100, 'Restaurant name cannot exceed 100 characters']
   },
   ownerName: {
-    type: DataTypes.STRING(50),
-    allowNull: false,
-    validate: {
-      notEmpty: {
-        msg: 'Owner name is required'
-      },
-      len: {
-        args: [1, 50],
-        msg: 'Owner name cannot exceed 50 characters'
-      }
-    }
+    type: String,
+    required: [true, 'Owner name is required'],
+    trim: true,
+    minlength: [2, 'Owner name must be at least 2 characters'],
+    maxlength: [100, 'Owner name cannot exceed 100 characters']
   },
-  location: {
-    type: DataTypes.STRING(100),
-    allowNull: true,
+  email: {
+    type: String,
+    unique: true,
+    sparse: true,
+    trim: true,
+    lowercase: true,
     validate: {
-      len: {
-        args: [0, 100],
-        msg: 'Location cannot exceed 100 characters'
-      }
-    }
-  },
-  establishmentYear: {
-    type: DataTypes.INTEGER,
-    allowNull: true,
-    validate: {
-      min: {
-        args: [1800],
-        msg: 'Establishment year must be after 1800'
+      validator: function(email) {
+        return !email || validator.isEmail(email);
       },
-      max: {
-        args: [new Date().getFullYear()],
-        msg: 'Establishment year cannot be in the future'
-      }
+      message: 'Invalid email format'
     }
   },
   phoneNumber: {
-    type: DataTypes.STRING(10),
+    type: String,
+    required: [true, 'Phone number is required'],
     unique: true,
-    allowNull: false,
     validate: {
-      notEmpty: {
-        msg: 'Phone number is required'
+      validator: function(phone) {
+        return /^[0-9]{10}$/.test(phone);
       },
-      is: {
-        args: /^[0-9]{10}$/,
-        msg: 'Phone number must be exactly 10 digits'
-      }
+      message: 'Phone number must be exactly 10 digits'
     }
   },
   hashedPassword: {
-    type: DataTypes.STRING(255),
-    allowNull: false,
-    validate: {
-      notEmpty: {
-        msg: 'Password is required'
-      }
-    }
+    type: String,
+    required: [true, 'Password is required'],
+    minlength: [8, 'Password must be at least 8 characters']
+  },
+  location: {
+    type: String,
+    trim: true,
+    maxlength: [200, 'Location cannot exceed 200 characters']
+  },
+  establishmentYear: {
+    type: Number,
+    min: [1800, 'Establishment year must be after 1800'],
+    max: [new Date().getFullYear(), 'Establishment year cannot be in the future']
   },
   documentUrl: {
-    type: DataTypes.TEXT,
-    allowNull: true
+    type: String,
+    trim: true,
+    validate: {
+      validator: function(url) {
+        return !url || validator.isURL(url);
+      },
+      message: 'Document URL must be a valid URL'
+    }
   },
   selectedServices: {
-    type: DataTypes.JSON,
-    allowNull: true,
-    defaultValue: []
+    type: [String],
+    default: []
   },
   planAmount: {
-    type: DataTypes.DECIMAL(10, 2),
-    allowNull: false,
-    defaultValue: 0,
-    validate: {
-      min: {
-        args: [0],
-        msg: 'Plan amount cannot be negative'
-      }
-    }
+    type: Number,
+    default: 0,
+    min: [0, 'Plan amount cannot be negative']
   },
   isActive: {
-    type: DataTypes.BOOLEAN,
-    allowNull: false,
-    defaultValue: true
+    type: Boolean,
+    default: true
+  },
+  isEmailVerified: {
+    type: Boolean,
+    default: false
+  },
+  isPhoneVerified: {
+    type: Boolean,
+    default: false
   },
   lastLogin: {
-    type: DataTypes.DATE,
-    allowNull: true
+    type: Date
+  },
+  profileCompleteness: {
+    type: Number,
+    default: 0,
+    min: [0, 'Profile completeness cannot be negative'],
+    max: [100, 'Profile completeness cannot exceed 100%']
+  },
+  subscriptionStatus: {
+    type: String,
+    enum: ['trial', 'active', 'suspended', 'cancelled'],
+    default: 'trial'
+  },
+  subscriptionEndDate: {
+    type: Date
   }
 }, {
-  tableName: 'restaurants',
-  timestamps: true,
-  indexes: [
-    {
-      unique: true,
-      fields: ['restaurantId']
-    },
-    {
-      unique: true,
-      fields: ['phoneNumber']
-    },
-    {
-      fields: ['isActive']
-    }
-  ],
-  hooks: {
-    beforeUpdate: (restaurant, options) => {
-      restaurant.updatedAt = new Date();
-    }
-  }
+  timestamps: true
 });
+
+// Indexes
+restaurantSchema.index({ restaurantId: 1 }, { unique: true });
+restaurantSchema.index({ phoneNumber: 1 }, { unique: true });
+restaurantSchema.index({ email: 1 }, { unique: true, sparse: true });
+restaurantSchema.index({ isActive: 1 });
+restaurantSchema.index({ subscriptionStatus: 1 });
+restaurantSchema.index({ createdAt: 1 });
+
+// Pre-save middleware to calculate profile completeness
+restaurantSchema.pre('save', function(next) {
+  let completeness = 0;
+  const fields = ['restaurantName', 'ownerName', 'phoneNumber', 'location', 'establishmentYear'];
+  
+  fields.forEach(field => {
+    if (this[field]) completeness += 20;
+  });
+  
+  this.profileCompleteness = completeness;
+  next();
+});
+
+// Instance method to update profile completeness
+restaurantSchema.methods.updateProfileCompleteness = function() {
+  let completeness = 0;
+  const fields = ['restaurantName', 'ownerName', 'phoneNumber', 'location', 'establishmentYear'];
+  
+  fields.forEach(field => {
+    if (this[field]) completeness += 20;
+  });
+  
+  this.profileCompleteness = completeness;
+  return this.save();
+};
+
+const Restaurant = mongoose.model('Restaurant', restaurantSchema);
 
 module.exports = Restaurant;

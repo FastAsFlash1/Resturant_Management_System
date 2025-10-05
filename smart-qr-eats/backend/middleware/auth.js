@@ -18,10 +18,8 @@ const authMiddleware = async (req, res, next) => {
     // Verify token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     
-    // Find restaurant by ID (using Sequelize)
-    const restaurant = await Restaurant.findByPk(decoded.id, {
-      attributes: { exclude: ['hashedPassword'] }
-    });
+    // Find restaurant by ID (using Mongoose)
+    const restaurant = await Restaurant.findById(decoded.id).select('-hashedPassword');
     
     if (!restaurant) {
       return res.status(401).json({
