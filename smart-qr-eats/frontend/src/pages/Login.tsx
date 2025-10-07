@@ -1,296 +1,242 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { 
-  Zap, 
+  ArrowLeft, 
   LogIn, 
+  User, 
+  Lock, 
   AlertCircle,
-  ArrowLeft,
   Eye,
   EyeOff,
-  ShieldCheck,
-  User,
-  Key,
-  Phone,
-  Loader2
+  Loader2,
+  Smartphone,
+  IdCard
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { toast } from '@/hooks/use-toast';
-import { apiService } from '@/services/api';
 import { useAuth } from '@/contexts/AuthContext';
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { loginWithCredentials, isAuthenticated, user, role, loading } = useAuth();
   const [formData, setFormData] = useState({
     identifier: '',
     password: ''
   });
-  const [errors, setErrors] = useState<Record<string, string>>({});
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  const validateForm = () => {
-    const newErrors: Record<string, string> = {};
-
-    if (!formData.identifier.trim()) {
-      newErrors.identifier = 'Restaurant ID or Phone Number is required';
+  useEffect(() => {
+    if (!loading && isAuthenticated && user && role) {
+      console.log('🟢 Already authenticated, redirecting based on role...');
+      if (role === 'admin') {
+        navigate('/admin', { replace: true });
+      } else if (role === 'kitchen') {
+        navigate('/kitchen', { replace: true });
+      }
     }
+  }, [isAuthenticated, user, role, loading, navigate]);
 
-    if (!formData.password) {
-      newErrors.password = 'Password is required';
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+        <div className="flex items-center space-x-3">
+          <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
+          <span className="text-gray-600">Checking authentication...</span>
+        </div>
+      </div>
+    );
+  }
+
+  const isPhoneNumber = /^[0-9]{10}$/.test(formData.identifier);
+  const isRestaurantId = /^RID[0-9]{6}$/.test(formData.identifier);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+
+    if (!formData.identifier || !formData.password) {
+      setError('Please fill in all fields');
+      return;
     }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleLogin = async () => {
-    if (!validateForm()) return;
 
     setIsLoading(true);
-    
-    try {
-      const response = await apiService.login({
-        identifier: formData.identifier,
-        password: formData.password
-      });
+    console.log('🔵 Login attempt:', { identifier: formData.identifier });
 
-      if (response.success) {
-        // Store authentication data
-        login(response.data.restaurant, response.data.token);
+    try {
+      const result = await loginWithCredentials(formData);
+      
+      if (result.success) {
+        console.log('🟢 Login successful');
         
         toast({
           title: "Login Successful! 🎉",
-          description: `Welcome back, ${response.data.restaurant.ownerName}!`,
+          description: result.message || 'Welcome back!',
         });
-        
-        // Redirect to admin panel
-        setTimeout(() => {
-          navigate('/admin');
-        }, 1000);
+
+        // Navigation will be handled by the useEffect when auth state updates
       } else {
-        toast({
-          title: "Login Failed",
-          description: response.message,
-          variant: "destructive"
-        });
+        setError(result.message || 'Login failed. Please try again.');
       }
     } catch (error: any) {
-      toast({
-        title: "Login Error",
-        description: error.message || 'Failed to log in. Please try again.',
-        variant: "destructive"
-      });
+      console.error('🔴 Login error:', error);
+      setError(error.message || 'Login failed. Please try again.');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleInputChange = (field: string, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-    // Clear error when user starts typing
-    if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: '' }));
-    }
+  const getInputIcon = () => {
+    if (isPhoneNumber) return <Smartphone className="h-4 w-4" />;
+    if (isRestaurantId) return <IdCard className="h-4 w-4" />;
+    return <User className="h-4 w-4" />;
   };
 
-  const isPhoneNumber = (str: string) => /^[0-9]{10}$/.test(str);
+  const getPlaceholderText = () => {
+    if (isPhoneNumber) return "Phone number detected";
+    if (isRestaurantId) return "Restaurant ID detected";
+    return "Restaurant ID, Phone Number, or Kitchen Username";
+  };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
-      {/* Header */}
-      <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b shadow-sm">
-        <div className="container mx-auto px-4 py-4">
-          <nav className="flex items-center justify-between">
-            <Link to="/" className="flex items-center gap-2">
-              <div className="w-10 h-10 rounded-full bg-gradient-to-r from-blue-600 to-purple-600 flex items-center justify-center">
-                <Zap className="h-6 w-6 text-white" />
-              </div>
-              <span className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                FastAsFlash
-              </span>
-            </Link>
-            
-            <div className="flex items-center gap-3">
-              <Button variant="outline" asChild>
-                <Link to="/">
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  Back to Home
-                </Link>
-              </Button>
-              <Button asChild>
-                <Link to="/signup">Join FastAsFlash</Link>
-              </Button>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+      <Card className="w-full max-w-md mx-auto shadow-2xl border-0">
+        <CardHeader className="text-center pb-4">
+          <div className="flex items-center justify-center mb-4">
+            <div className="bg-blue-600 text-white p-3 rounded-full">
+              <LogIn className="h-6 w-6" />
             </div>
-          </nav>
-        </div>
-      </header>
-
-      <div className="container mx-auto px-4 py-12">
-        <div className="max-w-md mx-auto">
-          {/* Welcome Card */}
-          <div className="text-center mb-8">
-            <div className="w-20 h-20 rounded-full bg-gradient-to-r from-blue-600 to-purple-600 flex items-center justify-center mx-auto mb-4">
-              <LogIn className="h-10 w-10 text-white" />
-            </div>
-            <h1 className="text-3xl font-bold mb-2">Welcome Back!</h1>
-            <p className="text-muted-foreground">
-              Sign in to access your restaurant dashboard
-            </p>
           </div>
+          <CardTitle className="text-2xl font-bold">Welcome Back</CardTitle>
+          <p className="text-gray-600 text-sm mt-2">
+            Sign in to your FastAsFlash dashboard
+          </p>
+        </CardHeader>
+        
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {error && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
 
-          {/* Login Form */}
-          <Card className="shadow-lg border-0">
-            <CardHeader className="text-center pb-4">
-              <CardTitle className="flex items-center justify-center gap-2">
-                <ShieldCheck className="h-5 w-5 text-blue-600" />
-                Restaurant Login
-              </CardTitle>
-            </CardHeader>
-            
-            <CardContent className="space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="identifier" className="flex items-center gap-2">
-                  {isPhoneNumber(formData.identifier) ? (
-                    <Phone className="h-4 w-4" />
-                  ) : (
-                    <User className="h-4 w-4" />
-                  )}
-                  Restaurant ID or Phone Number *
-                </Label>
+            <div className="space-y-2">
+              <Label htmlFor="identifier" className="text-sm font-medium">
+                Login Identifier *
+              </Label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                  {getInputIcon()}
+                </div>
                 <Input
                   id="identifier"
-                  placeholder="Restaurant ID (e.g., RID123456) or Phone Number (10 digits)"
+                  type="text"
+                  placeholder={getPlaceholderText()}
                   value={formData.identifier}
-                  onChange={(e) => handleInputChange('identifier', e.target.value)}
-                  className={`${isPhoneNumber(formData.identifier) ? '' : 'font-mono'} ${errors.identifier ? 'border-red-500' : ''}`}
+                  onChange={(e) => {
+                    const value = e.target.value.trim();
+                    setFormData({ ...formData, identifier: value });
+                    setError('');
+                  }}
+                  className="pl-10"
+                  disabled={isLoading}
                 />
-                {errors.identifier && (
-                  <p className="text-sm text-red-500 flex items-center gap-1">
-                    <AlertCircle className="h-4 w-4" />
-                    {errors.identifier}
-                  </p>
-                )}
-                <p className="text-xs text-muted-foreground">
-                  {isPhoneNumber(formData.identifier) 
-                    ? "Using phone number login" 
-                    : "You can use either your Restaurant ID or registered phone number"
-                  }
-                </p>
               </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="password" className="flex items-center gap-2">
-                  <Key className="h-4 w-4" />
-                  Password *
-                </Label>
-                <div className="relative">
-                  <Input
-                    id="password"
-                    type={showPassword ? 'text' : 'password'}
-                    placeholder="Enter your password"
-                    value={formData.password}
-                    onChange={(e) => handleInputChange('password', e.target.value)}
-                    className={errors.password ? 'border-red-500' : ''}
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="absolute right-2 top-1/2 transform -translate-y-1/2"
-                    onClick={() => setShowPassword(!showPassword)}
-                  >
-                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </Button>
+              <div className="text-xs text-gray-500 space-y-1">
+                <div className="flex items-center space-x-2">
+                  <IdCard className="h-3 w-3" />
+                  <span>Admin: Restaurant ID (RID123456) or Phone (10 digits)</span>
                 </div>
-                {errors.password && (
-                  <p className="text-sm text-red-500 flex items-center gap-1">
-                    <AlertCircle className="h-4 w-4" />
-                    {errors.password}
-                  </p>
-                )}
-              </div>
-
-              <div className="flex items-center justify-between text-sm">
-                <a href="#" className="text-blue-600 hover:underline">
-                  Forgot Restaurant ID?
-                </a>
-                <a href="#" className="text-blue-600 hover:underline">
-                  Forgot Password?
-                </a>
-              </div>
-
-              <Button 
-                onClick={handleLogin}
-                className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
-                size="lg"
-                disabled={isLoading}
-              >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Signing In...
-                  </>
-                ) : (
-                  <>
-                    <LogIn className="mr-2 h-4 w-4" />
-                    Sign In to Dashboard
-                  </>
-                )}
-              </Button>
-
-              <div className="text-center">
-                <p className="text-muted-foreground text-sm">
-                  Don't have an account?{' '}
-                  <Link to="/signup" className="text-blue-600 hover:underline font-medium">
-                    Join FastAsFlash
-                  </Link>
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Demo Credentials */}
-          <Card className="mt-6 bg-yellow-50 border-yellow-200">
-            <CardContent className="p-4">
-              <div className="flex items-start gap-2">
-                <Badge className="bg-yellow-500">Demo</Badge>
-                <div className="flex-1">
-                  <h4 className="font-medium text-yellow-800 mb-2">Try Demo Account</h4>
-                  <div className="space-y-1 text-sm text-yellow-700">
-                    <p><strong>ID:</strong> RID123456 or Phone: 9876543210</p>
-                    <p><strong>Password:</strong> Demo123456</p>
-                  </div>
-                  <Button 
-                    size="sm" 
-                    variant="outline" 
-                    className="mt-2 border-yellow-300 text-yellow-700 hover:bg-yellow-100"
-                    onClick={() => {
-                      setFormData({
-                        identifier: 'RID123456',
-                        password: 'Demo123456'
-                      });
-                    }}
-                  >
-                    Use Demo Credentials
-                  </Button>
+                <div className="flex items-center space-x-2">
+                  <User className="h-3 w-3" />
+                  <span>Kitchen: Username provided by admin</span>
                 </div>
               </div>
-            </CardContent>
-          </Card>
+            </div>
 
-          {/* Security Notice */}
-          <div className="mt-6 text-center">
-            <p className="text-xs text-muted-foreground">
-              🔒 Your data is protected with bank-level security
-            </p>
-          </div>
-        </div>
-      </div>
+            <div className="space-y-2">
+              <Label htmlFor="password" className="text-sm font-medium">
+                Password *
+              </Label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                  <Lock className="h-4 w-4" />
+                </div>
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Enter your password"
+                  value={formData.password}
+                  onChange={(e) => {
+                    setFormData({ ...formData, password: e.target.value });
+                    setError('');
+                  }}
+                  className="pl-10 pr-10"
+                  disabled={isLoading}
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                  onClick={() => setShowPassword(!showPassword)}
+                  disabled={isLoading}
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-4 w-4" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
+            </div>
+
+            <Button
+              type="submit"
+              className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Signing In...
+                </>
+              ) : (
+                <>
+                  <LogIn className="h-4 w-4 mr-2" />
+                  Sign In
+                </>
+              )}
+            </Button>
+
+            <div className="text-center space-y-4">
+              <p className="text-sm text-gray-600">
+                Don't have an account?{' '}
+                <Link to="/signup" className="text-blue-600 hover:underline font-medium">
+                  Create one here
+                </Link>
+              </p>
+              
+              <div className="flex items-center justify-center">
+                <Link 
+                  to="/" 
+                  className="flex items-center text-sm text-gray-500 hover:text-gray-700"
+                >
+                  <ArrowLeft className="h-4 w-4 mr-1" />
+                  Back to Home
+                </Link>
+              </div>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
     </div>
   );
 };

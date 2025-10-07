@@ -39,7 +39,7 @@ const Index = () => {
                 <UtensilsCrossed className="h-6 w-6 text-primary-foreground" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold">QR Restaurant</h1>
+                <h1 className="text-2xl font-bold">FastAsFlash Restaurant</h1>
                 <Badge variant="secondary">Table {tableId}</Badge>
               </div>
             </div>

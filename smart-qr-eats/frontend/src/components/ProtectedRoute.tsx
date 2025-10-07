@@ -5,36 +5,37 @@ import { Loader2 } from 'lucide-react';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
-  requireAuth?: boolean;
+  requiredRole?: 'admin' | 'kitchen';
 }
 
-const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ 
-  children, 
-  requireAuth = true 
-}) => {
-  const { user, token, isLoading } = useAuth();
+const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requiredRole }) => {
+  const { isAuthenticated, loading, role } = useAuth();
   const location = useLocation();
 
-  if (isLoading) {
+  if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="flex items-center gap-2">
-          <Loader2 className="h-6 w-6 animate-spin" />
-          <span>Loading...</span>
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+        <div className="flex items-center space-x-3">
+          <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
+          <span className="text-gray-600">Loading...</span>
         </div>
       </div>
     );
   }
 
-  if (requireAuth && (!user || !token)) {
-    // Redirect to login page with return url
+  if (!isAuthenticated) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  if (!requireAuth && user && token) {
-    // Redirect authenticated users away from auth pages
-    const from = location.state?.from?.pathname || '/admin';
-    return <Navigate to={from} replace />;
+  if (requiredRole && role !== requiredRole) {
+    // Redirect based on actual role
+    if (role === 'admin') {
+      return <Navigate to="/admin" replace />;
+    } else if (role === 'kitchen') {
+      return <Navigate to="/kitchen" replace />;
+    } else {
+      return <Navigate to="/login" replace />;
+    }
   }
 
   return <>{children}</>;

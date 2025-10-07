@@ -1,13 +1,13 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
-const auth = require('../middleware/auth');
+const { authMiddleware } = require('../middleware/auth');
 const Restaurant = require('../models/Restaurant');
 const router = express.Router();
 
 // @route   GET /api/admin/profile
 // @desc    Get restaurant profile
 // @access  Private
-router.get('/profile', auth, async (req, res) => {
+router.get('/profile', authMiddleware, async (req, res) => {
   try {
     const restaurant = req.restaurant;
     
@@ -39,7 +39,7 @@ router.get('/profile', auth, async (req, res) => {
 // @route   PUT /api/admin/update-username
 // @desc    Update owner name
 // @access  Private
-router.put('/update-username', auth, async (req, res) => {
+router.put('/update-username', authMiddleware, async (req, res) => {
   try {
     const { ownerName } = req.body;
 
@@ -98,7 +98,7 @@ router.put('/update-username', auth, async (req, res) => {
 // @route   PUT /api/admin/change-password
 // @desc    Change password
 // @access  Private
-router.put('/change-password', auth, async (req, res) => {
+router.put('/change-password', authMiddleware, async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
 
@@ -164,7 +164,7 @@ router.put('/change-password', auth, async (req, res) => {
 // @route   PUT /api/admin/update-profile
 // @desc    Update restaurant profile
 // @access  Private
-router.put('/update-profile', auth, async (req, res) => {
+router.put('/update-profile', authMiddleware, async (req, res) => {
   try {
     const { 
       restaurantName, 
@@ -253,7 +253,7 @@ router.put('/update-profile', auth, async (req, res) => {
 // @route   DELETE /api/admin/delete-account
 // @desc    Deactivate restaurant account
 // @access  Private
-router.delete('/delete-account', auth, async (req, res) => {
+router.delete('/delete-account', authMiddleware, async (req, res) => {
   try {
     const { password } = req.body;
 

@@ -3,22 +3,21 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const validator = require('validator');
 const Restaurant = require('../models/Restaurant');
-const authMiddleware = require('../middleware/auth');
+const Kitchen = require('../models/Kitchen');
+const { authMiddleware, adminOnly } = require('../middleware/auth');
 const router = express.Router();
 
-// Generate unique restaurant ID
 const generateRestaurantId = () => {
-  const prefix = 'RID';
-  const randomNum = Math.floor(100000 + Math.random() * 900000);
-  return prefix + randomNum;
+  const timestamp = Date.now().toString().slice(-6);
+  const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+  return `RID${timestamp}${random}`.slice(0, 9);
 };
 
-// Generate JWT token
-const generateToken = (restaurantId) => {
+const generateToken = (userId, role) => {
   return jwt.sign(
-    { id: restaurantId },
-    process.env.JWT_SECRET,
-    { expiresIn: process.env.JWT_EXPIRES_IN || '24h' }
+    { userId, role },
+    process.env.JWT_SECRET || 'fastasflash_secret_key_2024',
+    { expiresIn: '30d' }
   );
 };
 
@@ -26,6 +25,9 @@ const generateToken = (restaurantId) => {
 // @desc    Register new restaurant
 // @access  Public
 router.post('/signup', async (req, res) => {
+  console.log('🔵 Signup route hit!');
+  console.log('🔵 Request body:', req.body);
+  
   try {
     const {
       restaurantName,
@@ -39,50 +41,69 @@ router.post('/signup', async (req, res) => {
       planAmount
     } = req.body;
 
-    // Validation
-    if (!restaurantName || !ownerName || !phoneNumber || !password) {
+    console.log('🔵 Extracted data:', {
+      restaurantName,
+      ownerName,
+      location,
+      establishmentYear,
+      phoneNumber,
+      password: password ? '[PROVIDED]' : '[MISSING]',
+      documentUrl,
+      selectedServices,
+      planAmount
+    });
+
+    // Enhanced Validation
+    if (!restaurantName || !ownerName || !location || !phoneNumber || !password) {
+      console.log('🔴 Missing required fields');
+      const missingFields = [];
+      if (!restaurantName) missingFields.push('Restaurant Name');
+      if (!ownerName) missingFields.push('Owner Name');
+      if (!location) missingFields.push('Location');
+      if (!phoneNumber) missingFields.push('Phone Number');
+      if (!password) missingFields.push('Password');
+      
       return res.status(400).json({
         success: false,
-        message: 'Please provide all required fields'
+        message: `Missing required fields: ${missingFields.join(', ')}`
       });
     }
 
-    // Validate phone number
-    if (!/^[0-9]{10}$/.test(phoneNumber)) {
+    // More flexible phone number validation
+    const cleanPhoneNumber = phoneNumber.toString().replace(/\D/g, '');
+    if (cleanPhoneNumber.length !== 10) {
+      console.log('🔴 Invalid phone number length:', cleanPhoneNumber.length);
       return res.status(400).json({
         success: false,
         message: 'Phone number must be exactly 10 digits'
       });
     }
 
-    // Validate password
     if (password.length < 8) {
+      console.log('🔴 Password too short');
       return res.status(400).json({
         success: false,
         message: 'Password must be at least 8 characters long'
       });
     }
 
-    // Check if restaurant with phone number already exists
-    const existingRestaurant = await Restaurant.findOne({ phoneNumber });
+    // Check if phone number already exists
+    console.log('🔵 Checking if phone number exists...');
+    const existingRestaurant = await Restaurant.findOne({ phoneNumber: cleanPhoneNumber });
     if (existingRestaurant) {
+      console.log('🔴 Phone number already exists');
       return res.status(400).json({
         success: false,
-        message: 'Restaurant with this phone number already exists'
+        message: 'A restaurant with this phone number already exists'
       });
     }
 
-    // Hash password
-    const saltRounds = 12;
-    const hashedPassword = await bcrypt.hash(password, saltRounds);
-
-    // Generate unique restaurant ID
+    // Generate restaurant ID
     let restaurantId;
     let isUnique = false;
     let attempts = 0;
-    const maxAttempts = 10;
-
-    while (!isUnique && attempts < maxAttempts) {
+    
+    while (!isUnique && attempts < 10) {
       restaurantId = generateRestaurantId();
       const existing = await Restaurant.findOne({ restaurantId });
       if (!existing) {
@@ -92,30 +113,46 @@ router.post('/signup', async (req, res) => {
     }
 
     if (!isUnique) {
+      console.log('🔴 Failed to generate unique restaurant ID');
       return res.status(500).json({
         success: false,
-        message: 'Unable to generate unique restaurant ID. Please try again.'
+        message: 'Failed to generate unique restaurant ID. Please try again.'
       });
     }
 
+    console.log('🔵 Generated restaurant ID:', restaurantId);
+
+    // Hash password
+    console.log('🔵 Hashing password...');
+    const saltRounds = 12;
+    const hashedPassword = await bcrypt.hash(password, saltRounds);
+
     // Create new restaurant
-    const restaurant = new Restaurant({
+    console.log('🔵 Creating new restaurant...');
+    const newRestaurant = new Restaurant({
       restaurantId,
       restaurantName: restaurantName.trim(),
       ownerName: ownerName.trim(),
-      location: location?.trim(),
-      establishmentYear,
-      phoneNumber,
-      hashedPassword,
-      documentUrl: documentUrl?.trim(),
-      selectedServices: selectedServices || [],
-      planAmount: planAmount || 0
+      location: location.trim(),
+      establishmentYear: parseInt(establishmentYear) || new Date().getFullYear(),
+      phoneNumber: cleanPhoneNumber, // Use cleaned phone number
+      password: hashedPassword,
+      role: 'admin',
+      documentUrl: documentUrl || '',
+      selectedServices: Array.isArray(selectedServices) ? selectedServices : [],
+      planAmount: parseFloat(planAmount) || 0,
+      isActive: true,
+      createdAt: new Date()
     });
 
-    await restaurant.save();
+    console.log('🔵 Saving restaurant to database...');
+    await newRestaurant.save();
 
     // Generate token
-    const token = generateToken(restaurant._id);
+    console.log('🔵 Generating token...');
+    const token = generateToken(restaurantId, 'admin');
+
+    console.log('🟢 Restaurant created successfully!');
 
     res.status(201).json({
       success: true,
@@ -124,37 +161,44 @@ router.post('/signup', async (req, res) => {
         restaurantId,
         token,
         restaurant: {
-          restaurantId: restaurant.restaurantId,
-          restaurantName: restaurant.restaurantName,
-          ownerName: restaurant.ownerName,
-          phoneNumber: restaurant.phoneNumber
+          restaurantId: newRestaurant.restaurantId,
+          restaurantName: newRestaurant.restaurantName,
+          ownerName: newRestaurant.ownerName,
+          location: newRestaurant.location,
+          phoneNumber: newRestaurant.phoneNumber,
+          establishmentYear: newRestaurant.establishmentYear,
+          selectedServices: newRestaurant.selectedServices,
+          planAmount: newRestaurant.planAmount,
+          isActive: newRestaurant.isActive,
+          role: newRestaurant.role,
+          createdAt: newRestaurant.createdAt
         }
       }
     });
 
   } catch (error) {
-    console.error('Signup error:', error);
+    console.error('🔴 Signup error:', error);
     
-    if (error.name === 'ValidationError') {
-      const errors = Object.values(error.errors).map(err => err.message);
-      return res.status(400).json({
-        success: false,
-        message: 'Validation failed',
-        errors
-      });
-    }
-
     if (error.code === 11000) {
+      // Duplicate key error
       const field = Object.keys(error.keyPattern)[0];
       return res.status(400).json({
         success: false,
-        message: `${field} already exists`
+        message: `A restaurant with this ${field} already exists`
+      });
+    }
+
+    if (error.name === 'ValidationError') {
+      const messages = Object.values(error.errors).map(err => err.message);
+      return res.status(400).json({
+        success: false,
+        message: `Validation error: ${messages.join(', ')}`
       });
     }
 
     res.status(500).json({
       success: false,
-      message: 'Server error during registration'
+      message: 'Internal server error during registration'
     });
   }
 });
@@ -163,76 +207,204 @@ router.post('/signup', async (req, res) => {
 // @desc    Login restaurant
 // @access  Public
 router.post('/login', async (req, res) => {
+  console.log('🔵 Login route hit!');
+  console.log('🔵 Request body:', req.body);
+  
   try {
     const { identifier, password } = req.body;
 
-    // Validation
     if (!identifier || !password) {
+      console.log('🔴 Missing login credentials');
       return res.status(400).json({
         success: false,
-        message: 'Please provide identifier and password'
+        message: 'Please provide both identifier and password'
       });
     }
 
-    // Determine if identifier is phone number or restaurant ID
-    const isPhoneNumber = /^[0-9]{10}$/.test(identifier);
-    const query = isPhoneNumber 
-      ? { phoneNumber: identifier }
-      : { restaurantId: identifier };
+    // Clean identifier (remove non-digits if it's a phone number)
+    const cleanIdentifier = /^\d+$/.test(identifier) ? identifier.replace(/\D/g, '') : identifier;
 
-    // Find restaurant
-    const restaurant = await Restaurant.findOne(query);
-    if (!restaurant) {
-      return res.status(400).json({
+    // Find restaurant by phone number or restaurant ID
+    console.log('🔵 Looking for restaurant with identifier:', cleanIdentifier);
+    let user = await Restaurant.findOne({
+      $or: [
+        { phoneNumber: cleanIdentifier },
+        { restaurantId: cleanIdentifier }
+      ]
+    });
+
+    let userType = 'restaurant';
+
+    if (!user) {
+      user = await Kitchen.findOne({ username: cleanIdentifier });
+      userType = 'kitchen';
+    }
+
+    if (!user) {
+      console.log('🔴 User not found');
+      return res.status(401).json({
         success: false,
-        message: 'Invalid credentials'
+        message: 'Invalid credentials. Please check your identifier and password.'
       });
     }
 
-    // Check if account is active
-    if (!restaurant.isActive) {
-      return res.status(400).json({
-        success: false,
-        message: 'Account is deactivated. Please contact support.'
-      });
-    }
+    console.log('🔵 User found:', user.restaurantName || user.username);
 
-    // Verify password
-    const isPasswordValid = await bcrypt.compare(password, restaurant.hashedPassword);
+    // Check password
+    console.log('🔵 Verifying password...');
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+
     if (!isPasswordValid) {
-      return res.status(400).json({
+      console.log('🔴 Invalid password');
+      return res.status(401).json({
         success: false,
-        message: 'Invalid credentials'
+        message: 'Invalid credentials. Please check your password.'
       });
     }
 
-    // Update last login
-    restaurant.lastLogin = new Date();
-    await restaurant.save();
+    // Check if restaurant is active
+    if (!user.isActive) {
+      return res.status(401).json({
+        success: false,
+        message: 'Your account has been deactivated. Please contact support.'
+      });
+    }
 
     // Generate token
-    const token = generateToken(restaurant._id);
+    console.log('🔵 Generating token...');
+    const token = generateToken(
+      userType === 'restaurant' ? user.restaurantId : user.username,
+      user.role
+    );
+
+    // Update last login
+    user.lastLogin = new Date();
+    await user.save();
+
+    const responseData = {
+      token,
+      role: user.role,
+      [userType]: userType === 'restaurant' ? {
+        restaurantId: user.restaurantId,
+        restaurantName: user.restaurantName,
+        ownerName: user.ownerName,
+        location: user.location,
+        phoneNumber: user.phoneNumber,
+        establishmentYear: user.establishmentYear,
+        selectedServices: user.selectedServices,
+        planAmount: user.planAmount,
+        isActive: user.isActive,
+        role: user.role,
+        lastLogin: user.lastLogin
+      } : {
+        id: user._id,
+        restaurantId: user.restaurantId,
+        kitchenName: user.kitchenName,
+        username: user.username,
+        contactNumber: user.contactNumber,
+        isActive: user.isActive,
+        role: user.role,
+        lastLogin: user.lastLogin
+      }
+    };
+
+    console.log('🟢 Login successful!');
 
     res.json({
       success: true,
       message: 'Login successful',
+      data: responseData
+    });
+
+  } catch (error) {
+    console.error('🔴 Login error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error during login'
+    });
+  }
+});
+
+// @route   POST /api/auth/create-kitchen
+// @desc    Create a new kitchen account
+// @access  Private
+router.post('/create-kitchen', authMiddleware, adminOnly, async (req, res) => {
+  try {
+    const { kitchenName, username, password, contactNumber } = req.body;
+
+    if (!kitchenName || !username || !password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Kitchen name, username, and password are required'
+      });
+    }
+
+    const existingKitchen = await Kitchen.findOne({ username });
+    if (existingKitchen) {
+      return res.status(400).json({
+        success: false,
+        message: 'Username already exists'
+      });
+    }
+
+    const saltRounds = 12;
+    const hashedPassword = await bcrypt.hash(password, saltRounds);
+
+    const newKitchen = new Kitchen({
+      restaurantId: req.restaurantId,
+      kitchenName: kitchenName.trim(),
+      username: username.trim(),
+      password: hashedPassword,
+      contactNumber: contactNumber ? contactNumber.trim() : undefined,
+      role: 'kitchen',
+      isActive: true
+    });
+
+    await newKitchen.save();
+
+    res.status(201).json({
+      success: true,
+      message: 'Kitchen account created successfully',
       data: {
-        token,
-        restaurant: {
-          restaurantId: restaurant.restaurantId,
-          restaurantName: restaurant.restaurantName,
-          ownerName: restaurant.ownerName,
-          phoneNumber: restaurant.phoneNumber,
-          location: restaurant.location
-        }
+        id: newKitchen._id,
+        restaurantId: newKitchen.restaurantId,
+        kitchenName: newKitchen.kitchenName,
+        username: newKitchen.username,
+        contactNumber: newKitchen.contactNumber,
+        role: newKitchen.role,
+        isActive: newKitchen.isActive,
+        createdAt: newKitchen.createdAt
       }
     });
 
   } catch (error) {
-    console.error('Login error:', error);
+    console.error('Create kitchen error:', error);
     res.status(500).json({
       success: false,
-      message: 'Server error during login'
+      message: 'Internal server error during kitchen account creation'
+    });
+  }
+});
+
+// @route   GET /api/auth/kitchen-accounts
+// @desc    Get all kitchen accounts for the restaurant
+// @access  Private
+router.get('/kitchen-accounts', authMiddleware, adminOnly, async (req, res) => {
+  try {
+    const kitchenAccounts = await Kitchen.find({ 
+      restaurantId: req.restaurantId 
+    }).select('-password');
+
+    res.json({
+      success: true,
+      data: kitchenAccounts
+    });
+
+  } catch (error) {
+    console.error('Get kitchen accounts error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error'
     });
   }
 });
@@ -242,23 +414,77 @@ router.post('/login', async (req, res) => {
 // @access  Private
 router.post('/verify-token', async (req, res) => {
   try {
-    const authHeader = req.header('Authorization');
-    
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    const token = req.header('Authorization')?.replace('Bearer ', '') || req.body.token;
+
+    if (!token) {
       return res.status(401).json({
         success: false,
         message: 'No token provided'
       });
     }
 
-    const token = authHeader.substring(7);
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fastasflash_secret_key_2024');
     
-    const restaurant = await Restaurant.findById(decoded.id).select('-hashedPassword');
-    if (!restaurant || !restaurant.isActive) {
+    let user;
+    if (decoded.role === 'admin') {
+      user = await Restaurant.findOne({ restaurantId: decoded.userId });
+    } else {
+      user = await Kitchen.findOne({ username: decoded.userId });
+    }
+
+    if (!user) {
       return res.status(401).json({
         success: false,
         message: 'Invalid token'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Token is valid',
+      data: {
+        role: decoded.role,
+        user: decoded.role === 'admin' ? {
+          restaurantId: user.restaurantId,
+          restaurantName: user.restaurantName,
+          ownerName: user.ownerName,
+          location: user.location,
+          phoneNumber: user.phoneNumber,
+          establishmentYear: user.establishmentYear,
+          isActive: user.isActive,
+          role: user.role
+        } : {
+          id: user._id,
+          restaurantId: user.restaurantId,
+          kitchenName: user.kitchenName,
+          username: user.username,
+          contactNumber: user.contactNumber,
+          isActive: user.isActive,
+          role: user.role
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('Token verification error:', error);
+    res.status(401).json({
+      success: false,
+      message: 'Invalid token'
+    });
+  }
+});
+
+// @route   GET /api/auth/me
+// @desc    Get current restaurant profile
+// @access  Private
+router.get('/me', authMiddleware, async (req, res) => {
+  try {
+    const restaurant = await Restaurant.findOne({ restaurantId: req.restaurantId });
+
+    if (!restaurant) {
+      return res.status(404).json({
+        success: false,
+        message: 'Restaurant not found'
       });
     }
 
@@ -269,128 +495,34 @@ router.post('/verify-token', async (req, res) => {
           restaurantId: restaurant.restaurantId,
           restaurantName: restaurant.restaurantName,
           ownerName: restaurant.ownerName,
+          location: restaurant.location,
           phoneNumber: restaurant.phoneNumber,
-          location: restaurant.location
+          establishmentYear: restaurant.establishmentYear,
+          selectedServices: restaurant.selectedServices,
+          planAmount: restaurant.planAmount,
+          isActive: restaurant.isActive,
+          createdAt: restaurant.createdAt,
+          lastLogin: restaurant.lastLogin
         }
       }
     });
 
   } catch (error) {
-    res.status(401).json({
-      success: false,
-      message: 'Invalid or expired token'
-    });
-  }
-});
-
-// @route   GET /api/auth/me
-// @desc    Get current restaurant profile
-// @access  Private
-router.get('/me', authMiddleware, async (req, res) => {
-  try {
-    const restaurant = req.restaurant;
-    res.json({
-      success: true,
-      restaurant
-    });
-  } catch (error) {
     console.error('Get profile error:', error);
     res.status(500).json({
       success: false,
-      message: 'Error fetching profile'
+      message: 'Internal server error'
     });
   }
 });
 
-// @route   PUT /api/auth/profile
-// @desc    Update restaurant profile
-// @access  Private
-router.put('/profile', authMiddleware, async (req, res) => {
-  try {
-    const restaurantId = req.restaurant._id;
-    const updateData = req.body;
-
-    // Remove sensitive fields that shouldn't be updated this way
-    delete updateData.hashedPassword;
-    delete updateData.email;
-    delete updateData._id;
-    delete updateData.__v;
-
-    // Update restaurant
-    const updatedRestaurant = await Restaurant.findByIdAndUpdate(
-      restaurantId,
-      updateData,
-      { new: true, runValidators: true }
-    ).select('-hashedPassword');
-
-    if (!updatedRestaurant) {
-      return res.status(404).json({
-        success: false,
-        message: 'Restaurant not found'
-      });
-    }
-
-    res.json({
-      success: true,
-      message: 'Profile updated successfully',
-      restaurant: updatedRestaurant
-    });
-
-  } catch (error) {
-    console.error('Update profile error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error updating profile'
-    });
-  }
-});
-
-// @route   PUT /api/auth/change-password
-// @desc    Change password
-// @access  Private
-router.put('/change-password', authMiddleware, async (req, res) => {
-  try {
-    const { currentPassword, newPassword } = req.body;
-
-    if (!currentPassword || !newPassword) {
-      return res.status(400).json({
-        success: false,
-        message: 'Current password and new password are required'
-      });
-    }
-
-    // Get restaurant with password
-    const restaurant = await Restaurant.findById(req.restaurant._id);
-    
-    // Verify current password
-    const isCurrentPasswordValid = await bcrypt.compare(currentPassword, restaurant.hashedPassword);
-    if (!isCurrentPasswordValid) {
-      return res.status(400).json({
-        success: false,
-        message: 'Current password is incorrect'
-      });
-    }
-
-    // Hash new password
-    const saltRounds = 10;
-    const hashedNewPassword = await bcrypt.hash(newPassword, saltRounds);
-
-    // Update password
-    restaurant.hashedPassword = hashedNewPassword;
-    await restaurant.save();
-
-    res.json({
-      success: true,
-      message: 'Password changed successfully'
-    });
-
-  } catch (error) {
-    console.error('Change password error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error changing password'
-    });
-  }
+// Test route
+router.get('/test', (req, res) => {
+  res.json({
+    success: true,
+    message: 'Auth routes are working!',
+    timestamp: new Date().toISOString()
+  });
 });
 
 module.exports = router;

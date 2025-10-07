@@ -1,783 +1,1291 @@
-import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Navigate, Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { OrderStatusBadge } from '@/components/OrderStatusBadge';
-import { useRestaurant, MenuItem } from '@/contexts/RestaurantContext';
-import { useAuth } from '@/contexts/AuthContext';
-import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import {
-  LayoutDashboard,
-  ArrowLeft,
-  Plus,
-  Edit,
-  Trash2,
-  TrendingUp,
-  ShoppingBag,
-  DollarSign,
-  Save,
-  X,
-  Search,
-  Filter,
-  Eye,
-  EyeOff,
-  User,
-  Settings,
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { 
+  User, 
+  Phone, 
+  MapPin, 
+  Calendar, 
+  Building, 
+  Shield, 
   LogOut,
+  Settings,
+  BarChart3,
+  QrCode,
+  Users,
+  Package,
+  CreditCard,
+  Bell,
+  Download,
+  Edit,
+  Eye,
+  Loader2,
+  ChefHat,
+  Plus,
+  Trash2,
+  ExternalLink,
+  UtensilsCrossed,
+  Key,
+  Copy,
+  CheckCircle2
 } from 'lucide-react';
-import { toast } from 'sonner';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from '@/components/ui/alert-dialog';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+import { useAuth } from '@/contexts/AuthContext';
+import { useRestaurant } from '@/contexts/RestaurantContext';
+import { toast } from '@/hooks/use-toast';
+import { AddMenuModal } from '@/components/AddMenuModal';
 
-const Admin = () => {
-  const { user, logout } = useAuth();
-  const navigate = useNavigate();
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [isAddingItem, setIsAddingItem] = useState(false);
-  const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterCategory, setFilterCategory] = useState('all');
-  const [filterAvailability, setFilterAvailability] = useState('all');
+interface KitchenAccount {
+  id: string;
+  username: string;
+  kitchenName: string;
+  password: string;
+  contactNumber?: string;
+  isActive: boolean;
+  restaurantId: string;
+  createdAt: string;
+}
+
+const Admin: React.FC = () => {
+  const { user, logout, isAuthenticated, loading } = useAuth();
+  const { menu, orders } = useRestaurant();
+  const [activeTab, setActiveTab] = useState('overview');
   
-  const { orders, menu, addMenuItem, deleteMenuItem, updateMenuItem } = useRestaurant();
-
-  const [newItem, setNewItem] = useState({
-    name: '',
-    description: '',
-    price: '',
-    category: '',
-    image: '',
-    available: true,
-  });
-
-  const [editForm, setEditForm] = useState({
-    name: '',
-    description: '',
-    price: '',
-    category: '',
-    image: '',
-    available: true,
-  });
-
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (username === 'admin' && password === 'admin123') {
-      setIsLoggedIn(true);
-      toast.success('Welcome to Admin Dashboard!');
-    } else {
-      toast.error('Invalid credentials. Try admin/admin123');
-    }
-  };
-
-  const handleAddItem = () => {
-    if (!newItem.name || !newItem.price || !newItem.category) {
-      toast.error('Please fill all required fields');
-      return;
-    }
-
-    addMenuItem({
-      name: newItem.name,
-      description: newItem.description,
-      price: parseFloat(newItem.price),
-      category: newItem.category,
-      image: newItem.image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c',
-      available: newItem.available,
-    });
-
-    toast.success('Menu item added successfully!');
-    setNewItem({ name: '', description: '', price: '', category: '', image: '', available: true });
-    setIsAddingItem(false);
-  };
-
-  const handleEditItem = (item: MenuItem) => {
-    setEditingItem(item);
-    setEditForm({
-      name: item.name,
-      description: item.description,
-      price: item.price.toString(),
-      category: item.category,
-      image: item.image,
-      available: item.available,
-    });
-  };
-
-  const handleUpdateItem = () => {
-    if (!editingItem || !editForm.name || !editForm.price || !editForm.category) {
-      toast.error('Please fill all required fields');
-      return;
-    }
-
-    updateMenuItem(editingItem.id, {
-      name: editForm.name,
-      description: editForm.description,
-      price: parseFloat(editForm.price),
-      category: editForm.category,
-      image: editForm.image,
-      available: editForm.available,
-    });
-
-    toast.success('Menu item updated successfully!');
-    setEditingItem(null);
-  };
-
-  const handleQuickPriceUpdate = (itemId: string, newPrice: number) => {
-    updateMenuItem(itemId, { price: newPrice });
-    toast.success('Price updated successfully!');
-  };
-
-  const handleToggleAvailability = (itemId: string, available: boolean) => {
-    updateMenuItem(itemId, { available });
-    toast.success(`Item ${available ? 'enabled' : 'disabled'} successfully!`);
-  };
-
-  const categories = Array.from(new Set(menu.map(item => item.category)));
+  // Menu Management State
+  const [showAddMenuModal, setShowAddMenuModal] = useState(false);
   
-  const filteredMenu = menu.filter(item => {
-    const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         item.description.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = filterCategory === 'all' || item.category === filterCategory;
-    const matchesAvailability = filterAvailability === 'all' || 
-                               (filterAvailability === 'available' && item.available) ||
-                               (filterAvailability === 'unavailable' && !item.available);
-    
-    return matchesSearch && matchesCategory && matchesAvailability;
+  // QR Code Management State
+  const [tableNumbers, setTableNumbers] = useState<string[]>([]);
+  const [newTableNumber, setNewTableNumber] = useState('');
+  const [showQRDialog, setShowQRDialog] = useState(false);
+  const [selectedTable, setSelectedTable] = useState<string | null>(null);
+  
+  // Kitchen Management State
+  const [kitchenAccounts, setKitchenAccounts] = useState<KitchenAccount[]>([
+    {
+      id: 'kit_001',
+      username: 'kitchen_main',
+      kitchenName: 'Main Kitchen',
+      password: 'kitchen123',
+      contactNumber: '9876543210',
+      isActive: true,
+      restaurantId: user?.restaurantId || '',
+      createdAt: new Date().toISOString(),
+    }
+  ]);
+  const [showCreateKitchen, setShowCreateKitchen] = useState(false);
+  const [newKitchen, setNewKitchen] = useState({
+    username: '',
+    kitchenName: '',
+    password: '',
+    contactNumber: '',
+    isActive: true
   });
+  const [passwordVisible, setPasswordVisible] = useState<{[key: string]: boolean}>({});
+  const [copySuccess, setCopySuccess] = useState<{[key: string]: boolean}>({});
 
-  if (!isLoggedIn) {
+  // Show loading while checking authentication
+  if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-hero flex items-center justify-center p-4">
-        <Card className="w-full max-w-md shadow-hover">
-          <CardHeader className="text-center">
-            <div className="mx-auto w-16 h-16 rounded-full bg-gradient-primary flex items-center justify-center mb-4">
-              <LayoutDashboard className="h-8 w-8 text-primary-foreground" />
-            </div>
-            <CardTitle className="text-3xl">Admin Login</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleLogin} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="username">Username</Label>
-                <Input
-                  id="username"
-                  placeholder="admin"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="admin123"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                />
-              </div>
-              <Button type="submit" className="w-full" size="lg">
-                Login
-              </Button>
-              <p className="text-sm text-center text-muted-foreground">
-                Demo: admin / admin123
-              </p>
-            </form>
-          </CardContent>
-        </Card>
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+        <div className="flex items-center space-x-3">
+          <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
+          <span className="text-gray-600">Loading dashboard...</span>
+        </div>
       </div>
     );
   }
 
-  const totalRevenue = orders.reduce((sum, order) => sum + order.total, 0);
-  const totalOrders = orders.length;
-  const averageOrder = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+  // Redirect to login if not authenticated
+  if (!isAuthenticated || !user) {
+    console.log('🔴 Not authenticated, redirecting to login...');
+    return <Navigate to="/login" replace />;
+  }
+
+  console.log('🟢 Admin page - User authenticated:', user.restaurantName);
+
+  const handleLogout = () => {
+    logout();
+    toast({
+      title: "Logged Out",
+      description: "You have been successfully logged out.",
+    });
+  };
+
+  const formatDate = (dateString: string) => {
+    if (!dateString) return 'Not available';
+    return new Date(dateString).toLocaleDateString('en-IN', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  };
+
+  const formatTime = (dateString: string) => {
+    if (!dateString) return 'Never';
+    return new Date(dateString).toLocaleString('en-IN', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  // Kitchen Management Functions
+  const handleCreateKitchen = () => {
+    if (!newKitchen.username || !newKitchen.kitchenName || !newKitchen.password) {
+      toast({
+        title: "Error",
+        description: "Please fill in all required fields.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const kitchenAccount: KitchenAccount = {
+      id: `kit_${Date.now()}`,
+      username: newKitchen.username,
+      kitchenName: newKitchen.kitchenName,
+      password: newKitchen.password,
+      contactNumber: newKitchen.contactNumber,
+      isActive: newKitchen.isActive,
+      restaurantId: user?.restaurantId || '',
+      createdAt: new Date().toISOString(),
+    };
+
+    setKitchenAccounts(prev => [...prev, kitchenAccount]);
+    setNewKitchen({
+      username: '',
+      kitchenName: '',
+      password: '',
+      contactNumber: '',
+      isActive: true
+    });
+    setShowCreateKitchen(false);
+
+    toast({
+      title: "Success",
+      description: "Kitchen account created successfully!",
+    });
+  };
+
+  const handleDeleteKitchen = (kitchenId: string) => {
+    setKitchenAccounts(prev => prev.filter(k => k.id !== kitchenId));
+    toast({
+      title: "Success",
+      description: "Kitchen account deleted successfully!",
+    });
+  };
+
+  const handleToggleKitchenStatus = (kitchenId: string) => {
+    setKitchenAccounts(prev => 
+      prev.map(k => 
+        k.id === kitchenId ? { ...k, isActive: !k.isActive } : k
+      )
+    );
+  };
+
+  const handleCopyCredentials = (kitchen: KitchenAccount) => {
+    const credentials = `Kitchen Login Details:
+Username: ${kitchen.username}
+Password: ${kitchen.password}
+Kitchen Name: ${kitchen.kitchenName}
+Restaurant ID: ${kitchen.restaurantId}`;
+    
+    navigator.clipboard.writeText(credentials);
+    setCopySuccess(prev => ({ ...prev, [kitchen.id]: true }));
+    
+    setTimeout(() => {
+      setCopySuccess(prev => ({ ...prev, [kitchen.id]: false }));
+    }, 2000);
+
+    toast({
+      title: "Success",
+      description: "Kitchen credentials copied to clipboard!",
+    });
+  };
+
+  const generateRandomPassword = () => {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    let password = '';
+    for (let i = 0; i < 8; i++) {
+      password += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    setNewKitchen(prev => ({ ...prev, password }));
+  };
+
+  // QR Code Management Functions
+  const handleAddTable = () => {
+    if (!newTableNumber.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter a table number.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (tableNumbers.includes(newTableNumber.trim())) {
+      toast({
+        title: "Error",
+        description: "Table number already exists.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setTableNumbers(prev => [...prev, newTableNumber.trim()]);
+    setNewTableNumber('');
+    toast({
+      title: "Success",
+      description: "Table added successfully!",
+    });
+  };
+
+  const handleRemoveTable = (tableNumber: string) => {
+    setTableNumbers(prev => prev.filter(t => t !== tableNumber));
+    toast({
+      title: "Success",
+      description: "Table removed successfully!",
+    });
+  };
+
+  const generateQRCodeURL = (tableNumber: string) => {
+    const baseURL = window.location.origin;
+    return `${baseURL}/?table=${tableNumber}`;
+  };
+
+  const handleDownloadQR = async (tableNumber: string) => {
+    const url = generateQRCodeURL(tableNumber);
+    const qrCodeURL = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(url)}`;
+    
+    try {
+      const response = await fetch(qrCodeURL);
+      const blob = await response.blob();
+      const downloadURL = window.URL.createObjectURL(blob);
+      
+      const link = document.createElement('a');
+      link.href = downloadURL;
+      link.download = `table-${tableNumber}-qr.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(downloadURL);
+      
+      toast({
+        title: "Success",
+        description: "QR code downloaded successfully!",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to download QR code.",
+        variant: "destructive"
+      });
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-gradient-hero">
-      <header className="sticky top-0 z-40 bg-card border-b shadow-card">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-gradient-primary flex items-center justify-center">
-                <LayoutDashboard className="h-6 w-6 text-primary-foreground" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold">Admin Dashboard</h1>
-                {user && (
-                  <p className="text-sm text-muted-foreground">
-                    Welcome back, {user.ownerName}
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
+      {/* Header */}
+      <header className="bg-white shadow-sm border-b sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center py-3 sm:py-4">
+            <div className="flex items-center space-x-2 sm:space-x-4 min-w-0 flex-1">
+              <div className="flex items-center min-w-0">
+                <div className="bg-blue-600 text-white p-1.5 sm:p-2 rounded-lg">
+                  <Building className="h-4 w-4 sm:h-6 sm:w-6" />
+                </div>
+                <div className="ml-2 sm:ml-3 min-w-0 flex-1">
+                  <h1 className="text-lg sm:text-xl font-bold text-gray-900 truncate">
+                    FastAsFlash Admin
+                  </h1>
+                  <p className="text-xs sm:text-sm text-gray-600 truncate">
+                    {user.restaurantName}
                   </p>
-                )}
+                </div>
               </div>
             </div>
-            <div className="flex items-center gap-3">
-              <Button variant="outline" onClick={() => navigate('/')}>
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Back to Menu
-              </Button>
+            
+            <div className="flex items-center space-x-2 sm:space-x-4">
+              <Badge variant="secondary" className="text-xs hidden sm:flex">
+                <Shield className="h-3 w-3 mr-1" />
+                {user.restaurantId}
+              </Badge>
               
-              {user && (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" className="flex items-center gap-2">
-                      <User className="h-4 w-4" />
-                      {user.ownerName}
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-56">
-                    <DropdownMenuLabel>My Account</DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem asChild>
-                      <Link to="/profile" className="flex items-center gap-2">
-                        <Settings className="h-4 w-4" />
-                        Profile Settings
-                      </Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem 
-                      onClick={() => {
-                        logout();
-                        navigate('/login');
-                      }}
-                      className="flex items-center gap-2 text-red-600"
-                    >
-                      <LogOut className="h-4 w-4" />
-                      Logout
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleLogout}
+                className="flex items-center space-x-1 sm:space-x-2"
+              >
+                <LogOut className="h-3 w-3 sm:h-4 sm:w-4" />
+                <span className="hidden sm:inline">Logout</span>
+              </Button>
             </div>
           </div>
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-8">
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <Card className="shadow-card">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Total Revenue
-              </CardTitle>
-              <DollarSign className="h-4 w-4 text-primary" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-primary">₹{totalRevenue}</div>
-            </CardContent>
-          </Card>
+      {/* Main Content */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+          {/* Mobile-first responsive tabs */}
+          <div className="w-full overflow-x-auto">
+            <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 min-w-fit">
+              <TabsTrigger value="overview" className="flex items-center justify-center space-x-1 px-2 py-2 text-xs sm:text-sm">
+                <BarChart3 className="h-3 w-3 sm:h-4 sm:w-4" />
+                <span className="hidden xs:inline">Overview</span>
+              </TabsTrigger>
+              <TabsTrigger value="profile" className="flex items-center justify-center space-x-1 px-2 py-2 text-xs sm:text-sm">
+                <User className="h-3 w-3 sm:h-4 sm:w-4" />
+                <span className="hidden xs:inline">Profile</span>
+              </TabsTrigger>
+              <TabsTrigger value="kitchen-mgmt" className="flex items-center justify-center space-x-1 px-2 py-2 text-xs sm:text-sm">
+                <Users className="h-3 w-3 sm:h-4 sm:w-4" />
+                <span className="hidden xs:inline">Kitchen</span>
+              </TabsTrigger>
+              <TabsTrigger value="customer-view" className="flex items-center justify-center space-x-1 px-2 py-2 text-xs sm:text-sm">
+                <Eye className="h-3 w-3 sm:h-4 sm:w-4" />
+                <span className="hidden xs:inline">Customer</span>
+              </TabsTrigger>
+              <TabsTrigger value="qr-codes" className="flex items-center justify-center space-x-1 px-2 py-2 text-xs sm:text-sm">
+                <QrCode className="h-3 w-3 sm:h-4 sm:w-4" />
+                <span className="hidden sm:inline">QR</span>
+              </TabsTrigger>
+              <TabsTrigger value="menu" className="flex items-center justify-center space-x-1 px-2 py-2 text-xs sm:text-sm">
+                <Package className="h-3 w-3 sm:h-4 sm:w-4" />
+                <span className="hidden sm:inline">Menu</span>
+              </TabsTrigger>
+              <TabsTrigger value="analytics" className="flex items-center justify-center space-x-1 px-2 py-2 text-xs sm:text-sm">
+                <BarChart3 className="h-3 w-3 sm:h-4 sm:w-4" />
+                <span className="hidden sm:inline">Analytics</span>
+              </TabsTrigger>
+              <TabsTrigger value="settings" className="flex items-center justify-center space-x-1 px-2 py-2 text-xs sm:text-sm">
+                <Settings className="h-3 w-3 sm:h-4 sm:w-4" />
+                <span className="hidden sm:inline">Settings</span>
+              </TabsTrigger>
+            </TabsList>
+          </div>
 
-          <Card className="shadow-card">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Total Orders
-              </CardTitle>
-              <ShoppingBag className="h-4 w-4 text-primary" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold">{totalOrders}</div>
-            </CardContent>
-          </Card>
+          {/* Overview Tab */}
+          <TabsContent value="overview" className="space-y-4 sm:space-y-6">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
+              <Card className="hover:shadow-md transition-shadow">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-xs sm:text-sm font-medium truncate">Total Orders</CardTitle>
+                  <Package className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground flex-shrink-0" />
+                </CardHeader>
+                <CardContent className="pt-2">
+                  <div className="text-xl sm:text-2xl font-bold">{orders.length}</div>
+                  <p className="text-xs text-muted-foreground">
+                    {orders.length > 0 ? `${orders.filter(o => o.status === 'completed').length} completed` : 'No orders yet'}
+                  </p>
+                </CardContent>
+              </Card>
 
-          <Card className="shadow-card">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Average Order
-              </CardTitle>
-              <TrendingUp className="h-4 w-4 text-primary" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-primary">
-                ₹{averageOrder.toFixed(0)}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+              <Card className="hover:shadow-md transition-shadow">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-xs sm:text-sm font-medium truncate">Revenue</CardTitle>
+                  <CreditCard className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground flex-shrink-0" />
+                </CardHeader>
+                <CardContent className="pt-2">
+                  <div className="text-xl sm:text-2xl font-bold">
+                    ₹{orders.reduce((sum, order) => sum + order.total, 0).toLocaleString('en-IN')}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {orders.length > 0 ? `From ${orders.length} orders` : 'No revenue yet'}
+                  </p>
+                </CardContent>
+              </Card>
 
-        <Tabs defaultValue="orders" className="w-full">
-          <TabsList className="grid w-full max-w-md mx-auto grid-cols-2">
-            <TabsTrigger value="orders">Orders</TabsTrigger>
-            <TabsTrigger value="menu">Menu Management</TabsTrigger>
-          </TabsList>
+              <Card className="hover:shadow-md transition-shadow">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-xs sm:text-sm font-medium truncate">Menu Items</CardTitle>
+                  <Users className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground flex-shrink-0" />
+                </CardHeader>
+                <CardContent className="pt-2">
+                  <div className="text-xl sm:text-2xl font-bold">{menu.length}</div>
+                  <p className="text-xs text-muted-foreground">
+                    {menu.filter(item => item.available).length} available
+                  </p>
+                </CardContent>
+              </Card>
 
-          <TabsContent value="orders" className="mt-8">
-            <div className="space-y-4">
-              {orders.map((order) => (
-                <Card key={order.id} className="shadow-card animate-slide-up">
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <CardTitle>
-                          Table {order.tableId} - Order #{order.id.slice(-4)}
-                        </CardTitle>
-                        <p className="text-sm text-muted-foreground mt-1">
-                          {order.timestamp.toLocaleString()}
-                        </p>
-                      </div>
-                      <OrderStatusBadge status={order.status} />
+              <Card className="hover:shadow-md transition-shadow">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-xs sm:text-sm font-medium truncate">Kitchen Accounts</CardTitle>
+                  <QrCode className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground flex-shrink-0" />
+                </CardHeader>
+                <CardContent className="pt-2">
+                  <div className="text-xl sm:text-2xl font-bold">{kitchenAccounts.length}</div>
+                  <p className="text-xs text-muted-foreground">
+                    {kitchenAccounts.filter(k => k.isActive).length} active
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Recent Orders</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {orders.length === 0 ? (
+                    <div className="text-center py-8 text-gray-500">
+                      <Package className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                      <p className="text-sm">No orders yet</p>
+                      <p className="text-xs">Orders will appear here once customers start ordering</p>
                     </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2 mb-4">
-                      {order.items.map((item) => (
-                        <div key={item.id} className="flex justify-between">
-                          <span>
-                            {item.name} x {item.quantity}
-                          </span>
-                          <span className="font-medium">
-                            ₹{item.price * item.quantity}
-                          </span>
+                  ) : (
+                    <div className="space-y-3">
+                      {orders.slice(0, 5).map((order) => (
+                        <div key={order.id} className="flex items-center justify-between p-3 border rounded-lg">
+                          <div className="flex items-center space-x-3">
+                            <div className="bg-blue-100 p-2 rounded-full">
+                              <Package className="h-4 w-4 text-blue-600" />
+                            </div>
+                            <div>
+                              <p className="font-medium text-sm">Table {order.tableId}</p>
+                              <p className="text-xs text-gray-600">
+                                {order.items.length} items • ₹{order.total}
+                              </p>
+                            </div>
+                          </div>
+                          <Badge variant={
+                            order.status === 'completed' ? 'default' :
+                            order.status === 'ready' ? 'secondary' :
+                            order.status === 'preparing' ? 'outline' : 'destructive'
+                          }>
+                            {order.status}
+                          </Badge>
                         </div>
                       ))}
+                      {orders.length > 5 && (
+                        <Button variant="outline" size="sm" className="w-full" asChild>
+                          <Link to="/kitchen">
+                            View All Orders
+                          </Link>
+                        </Button>
+                      )}
                     </div>
-                    <div className="flex justify-between items-center pt-4 border-t">
-                      <span className="text-sm text-muted-foreground">
-                        Payment: {order.paymentType}
-                      </span>
-                      <span className="text-xl font-bold text-primary">
-                        ₹{order.total}
-                      </span>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Quick Actions</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-3">
+                    <Button 
+                      className="w-full justify-start" 
+                      variant="outline"
+                      onClick={() => setActiveTab('qr-codes')}
+                    >
+                      <QrCode className="h-4 w-4 mr-2" />
+                      Generate Table QR Codes
+                    </Button>
+
+                    <Button 
+                      className="w-full justify-start" 
+                      variant="outline"
+                      onClick={() => setActiveTab('menu')}
+                    >
+                      <Package className="h-4 w-4 mr-2" />
+                      Manage Menu Items
+                    </Button>
+
+                    <Button 
+                      className="w-full justify-start" 
+                      variant="outline"
+                      onClick={() => setActiveTab('kitchen-mgmt')}
+                    >
+                      <ChefHat className="h-4 w-4 mr-2" />
+                      Kitchen Management
+                    </Button>
+
+                    <Button 
+                      className="w-full justify-start" 
+                      variant="outline"
+                      asChild
+                    >
+                      <Link to="/?table=demo">
+                        <Eye className="h-4 w-4 mr-2" />
+                        View Customer Experience
+                      </Link>
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 sm:gap-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Restaurant Information</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-1 gap-3">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Restaurant ID:</span>
+                      <Badge variant="secondary">{user.restaurantId}</Badge>
                     </div>
-                  </CardContent>
-                </Card>
-              ))}
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Plan:</span>
+                      <Badge variant="outline">₹{user.planAmount?.toLocaleString('en-IN') || '0'}</Badge>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Status:</span>
+                      <Badge variant={user.isActive ? "default" : "destructive"}>
+                        {user.isActive ? 'Active' : 'Inactive'}
+                      </Badge>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Member Since:</span>
+                      <span className="text-sm">{formatDate(user.createdAt)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Last Login:</span>
+                      <span className="text-sm">{formatTime(user.lastLogin)}</span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
           </TabsContent>
 
-          <TabsContent value="menu" className="mt-8">
-            {/* Menu Management Header */}
-            <div className="mb-6 space-y-4">
-              <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-                <div className="flex flex-col sm:flex-row gap-4">
-                  <Dialog open={isAddingItem} onOpenChange={setIsAddingItem}>
-                    <DialogTrigger asChild>
-                      <Button>
-                        <Plus className="h-4 w-4 mr-2" />
-                        Add Menu Item
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent className="max-w-2xl">
-                      <DialogHeader>
-                        <DialogTitle>Add New Menu Item</DialogTitle>
-                      </DialogHeader>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-4">
-                          <div className="space-y-2">
-                            <Label>Name *</Label>
-                            <Input
-                              value={newItem.name}
-                              onChange={(e) =>
-                                setNewItem({ ...newItem, name: e.target.value })
-                              }
-                              placeholder="Item name"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label>Description</Label>
-                            <Textarea
-                              value={newItem.description}
-                              onChange={(e) =>
-                                setNewItem({ ...newItem, description: e.target.value })
-                              }
-                              placeholder="Item description"
-                              className="min-h-[100px]"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label>Price *</Label>
-                            <Input
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              value={newItem.price}
-                              onChange={(e) =>
-                                setNewItem({ ...newItem, price: e.target.value })
-                              }
-                              placeholder="0.00"
-                            />
-                          </div>
-                        </div>
-                        <div className="space-y-4">
-                          <div className="space-y-2">
-                            <Label>Category *</Label>
-                            <Select
-                              value={newItem.category}
-                              onValueChange={(value) =>
-                                setNewItem({ ...newItem, category: value })
-                              }
-                            >
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select or type category" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {categories.map((category) => (
-                                  <SelectItem key={category} value={category}>
-                                    {category}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <Input
-                              value={newItem.category}
-                              onChange={(e) =>
-                                setNewItem({ ...newItem, category: e.target.value })
-                              }
-                              placeholder="Or type new category"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label>Image URL</Label>
-                            <Input
-                              value={newItem.image}
-                              onChange={(e) =>
-                                setNewItem({ ...newItem, image: e.target.value })
-                              }
-                              placeholder="https://..."
-                            />
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <Switch
-                              id="available"
-                              checked={newItem.available}
-                              onCheckedChange={(checked) =>
-                                setNewItem({ ...newItem, available: checked })
-                              }
-                            />
-                            <Label htmlFor="available">Available</Label>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex gap-2 mt-6">
-                        <Button onClick={handleAddItem} className="flex-1">
-                          <Plus className="h-4 w-4 mr-2" />
-                          Add Item
-                        </Button>
-                        <Button
-                          variant="outline"
-                          onClick={() => setIsAddingItem(false)}
-                        >
-                          Cancel
-                        </Button>
-                      </div>
-                    </DialogContent>
-                  </Dialog>
-                </div>
-                
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <span>Total: {menu.length} items</span>
-                  <span>•</span>
-                  <span>Available: {menu.filter(i => i.available).length}</span>
-                </div>
-              </div>
+          {/* Profile Tab */}
+          <TabsContent value="profile" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <User className="h-5 w-5" />
+                  <span>Restaurant Profile</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <div>
+                      <label className="text-sm font-medium text-gray-700">Restaurant Name</label>
+                      <p className="mt-1 text-sm text-gray-900 bg-gray-50 p-3 rounded-md">
+                        {user.restaurantName}
+                      </p>
+                    </div>
 
-              {/* Search and Filters */}
-              <div className="flex flex-col sm:flex-row gap-4">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search menu items..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10"
-                  />
-                </div>
-                <Select value={filterCategory} onValueChange={setFilterCategory}>
-                  <SelectTrigger className="w-48">
-                    <Filter className="h-4 w-4 mr-2" />
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Categories</SelectItem>
-                    {categories.map((category) => (
-                      <SelectItem key={category} value={category}>
-                        {category}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Select value={filterAvailability} onValueChange={setFilterAvailability}>
-                  <SelectTrigger className="w-48">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Items</SelectItem>
-                    <SelectItem value="available">Available Only</SelectItem>
-                    <SelectItem value="unavailable">Unavailable Only</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-700">Owner Name</label>
+                      <p className="mt-1 text-sm text-gray-900 bg-gray-50 p-3 rounded-md flex items-center">
+                        <User className="h-4 w-4 mr-2 text-gray-500" />
+                        {user.ownerName}
+                      </p>
+                    </div>
 
-            {/* Menu Items Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredMenu.map((item) => (
-                <Card key={item.id} className={`shadow-card transition-all ${!item.available ? 'opacity-75 border-muted' : ''}`}>
-                  <div className="aspect-video w-full overflow-hidden relative">
-                    <img
-                      src={item.image}
-                      alt={item.name}
-                      className="w-full h-full object-cover"
-                    />
-                    {!item.available && (
-                      <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                        <Badge variant="secondary" className="bg-red-100 text-red-800">
-                          <EyeOff className="h-3 w-3 mr-1" />
-                          Unavailable
+                    <div>
+                      <label className="text-sm font-medium text-gray-700">Phone Number</label>
+                      <p className="mt-1 text-sm text-gray-900 bg-gray-50 p-3 rounded-md flex items-center">
+                        <Phone className="h-4 w-4 mr-2 text-gray-500" />
+                        +91 {user.phoneNumber}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div>
+                      <label className="text-sm font-medium text-gray-700">Location</label>
+                      <p className="mt-1 text-sm text-gray-900 bg-gray-50 p-3 rounded-md flex items-center">
+                        <MapPin className="h-4 w-4 mr-2 text-gray-500" />
+                        {user.location}
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="text-sm font-medium text-gray-700">Establishment Year</label>
+                      <p className="mt-1 text-sm text-gray-900 bg-gray-50 p-3 rounded-md flex items-center">
+                        <Calendar className="h-4 w-4 mr-2 text-gray-500" />
+                        {user.establishmentYear}
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="text-sm font-medium text-gray-700">Restaurant ID</label>
+                      <p className="mt-1 text-sm text-gray-900 bg-gray-50 p-3 rounded-md flex items-center">
+                        <Shield className="h-4 w-4 mr-2 text-gray-500" />
+                        {user.restaurantId}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-4 border-t">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <h4 className="font-medium">Selected Services</h4>
+                      <p className="text-sm text-gray-600">Services included in your plan</p>
+                    </div>
+                    <Button variant="outline" size="sm">
+                      <Edit className="h-4 w-4 mr-2" />
+                      Edit Profile
+                    </Button>
+                  </div>
+                  
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {user.selectedServices && user.selectedServices.length > 0 ? (
+                      user.selectedServices.map((service, index) => (
+                        <Badge key={index} variant="secondary">
+                          {service.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
                         </Badge>
-                      </div>
+                      ))
+                    ) : (
+                      <p className="text-sm text-gray-500">No services selected</p>
                     )}
                   </div>
-                  <CardContent className="p-4">
-                    <div className="flex items-start justify-between mb-2">
-                      <div className="flex-1">
-                        <h3 className="font-semibold text-lg mb-1">{item.name}</h3>
-                        <Badge variant="secondary" className="mb-2">
-                          {item.category}
-                        </Badge>
-                      </div>
-                      <Switch
-                        checked={item.available}
-                        onCheckedChange={(checked) => handleToggleAvailability(item.id, checked)}
-                        size="sm"
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Kitchen Management Tab */}
+          <TabsContent value="kitchen-mgmt" className="space-y-4 sm:space-y-6">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div>
+                <h2 className="text-xl sm:text-2xl font-bold">Kitchen Management</h2>
+                <p className="text-gray-600 text-sm sm:text-base">Create and manage kitchen accounts for your restaurant</p>
+              </div>
+              <Dialog open={showCreateKitchen} onOpenChange={setShowCreateKitchen}>
+                <DialogTrigger asChild>
+                  <Button className="w-full sm:w-auto">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create Kitchen Account
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>Create Kitchen Account</DialogTitle>
+                    <DialogDescription>
+                      Create a new kitchen account for your staff to manage orders.
+                    </DialogDescription>
+                  </DialogHeader>
+                  
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="kitchen-username">Username *</Label>
+                      <Input
+                        id="kitchen-username"
+                        value={newKitchen.username}
+                        onChange={(e) => setNewKitchen(prev => ({ ...prev, username: e.target.value }))}
+                        placeholder="kitchen_main"
                       />
                     </div>
-                    <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
-                      {item.description}
-                    </p>
-                    
-                    {/* Quick Price Edit */}
-                    <div className="mb-4">
-                      <Label className="text-xs text-muted-foreground">Price</Label>
-                      <div className="flex items-center gap-2 mt-1">
+
+                    <div className="space-y-2">
+                      <Label htmlFor="kitchen-name">Kitchen Name *</Label>
+                      <Input
+                        id="kitchen-name"
+                        value={newKitchen.kitchenName}
+                        onChange={(e) => setNewKitchen(prev => ({ ...prev, kitchenName: e.target.value }))}
+                        placeholder="Main Kitchen"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="kitchen-password">Password *</Label>
+                      <div className="flex gap-2">
                         <Input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          defaultValue={item.price}
-                          className="text-lg font-bold"
-                          onBlur={(e) => {
-                            const newPrice = parseFloat(e.target.value);
-                            if (newPrice !== item.price && newPrice > 0) {
-                              handleQuickPriceUpdate(item.id, newPrice);
-                            }
-                          }}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              const newPrice = parseFloat(e.currentTarget.value);
-                              if (newPrice !== item.price && newPrice > 0) {
-                                handleQuickPriceUpdate(item.id, newPrice);
-                              }
-                            }
-                          }}
+                          id="kitchen-password"
+                          type={passwordVisible.new ? 'text' : 'password'}
+                          value={newKitchen.password}
+                          onChange={(e) => setNewKitchen(prev => ({ ...prev, password: e.target.value }))}
+                          placeholder="Enter password"
                         />
-                        <span className="text-sm text-muted-foreground">₹</span>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={generateRandomPassword}
+                        >
+                          <Key className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setPasswordVisible(prev => ({ ...prev, new: !prev.new }))}
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
                       </div>
                     </div>
 
-                    <div className="flex gap-2">
-                      <Button 
-                        size="sm" 
-                        variant="outline" 
-                        className="flex-1"
-                        onClick={() => handleEditItem(item)}
-                      >
-                        <Edit className="h-4 w-4 mr-1" />
-                        Edit
-                      </Button>
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button size="sm" variant="outline">
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Delete Menu Item</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              Are you sure you want to delete "{item.name}"? This action cannot be undone.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction
-                              onClick={() => {
-                                deleteMenuItem(item.id);
-                                toast.success('Item deleted successfully!');
-                              }}
-                              className="bg-red-600 hover:bg-red-700"
-                            >
-                              Delete
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
+                    <div className="space-y-2">
+                      <Label htmlFor="kitchen-contact">Contact Number</Label>
+                      <Input
+                        id="kitchen-contact"
+                        value={newKitchen.contactNumber}
+                        onChange={(e) => setNewKitchen(prev => ({ ...prev, contactNumber: e.target.value }))}
+                        placeholder="9876543210"
+                      />
                     </div>
-                  </CardContent>
-                </Card>
-              ))}
+
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        id="kitchen-active"
+                        checked={newKitchen.isActive}
+                        onCheckedChange={(checked) => setNewKitchen(prev => ({ ...prev, isActive: checked }))}
+                      />
+                      <Label htmlFor="kitchen-active">Active Account</Label>
+                    </div>
+                  </div>
+
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setShowCreateKitchen(false)}>
+                      Cancel
+                    </Button>
+                    <Button onClick={handleCreateKitchen}>
+                      Create Kitchen Account
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
             </div>
 
-            {filteredMenu.length === 0 && (
-              <div className="text-center py-12">
-                <div className="text-6xl mb-4">🍽️</div>
-                <h3 className="text-lg font-semibold mb-2">No items found</h3>
-                <p className="text-muted-foreground">
-                  {searchTerm || filterCategory !== 'all' || filterAvailability !== 'all'
-                    ? "Try adjusting your search or filters"
-                    : "Add your first menu item to get started"}
-                </p>
+            <div className="grid gap-4">
+              {kitchenAccounts.length === 0 ? (
+                <Card>
+                  <CardContent className="py-12 text-center">
+                    <ChefHat className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">No Kitchen Accounts</h3>
+                    <p className="text-gray-600 mb-6">Create your first kitchen account to get started.</p>
+                    <Button onClick={() => setShowCreateKitchen(true)}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Create Kitchen Account
+                    </Button>
+                  </CardContent>
+                </Card>
+              ) : (
+                kitchenAccounts.map((kitchen) => (
+                  <Card key={kitchen.id}>
+                    <CardHeader>
+                      <div className="flex justify-between items-start">
+                        <div className="flex items-center space-x-3">
+                          <div className="bg-green-100 p-2 rounded-full">
+                            <ChefHat className="h-5 w-5 text-green-600" />
+                          </div>
+                          <div>
+                            <CardTitle className="text-lg">{kitchen.kitchenName}</CardTitle>
+                            <p className="text-sm text-gray-600">@{kitchen.username}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Badge variant={kitchen.isActive ? "default" : "secondary"}>
+                            {kitchen.isActive ? 'Active' : 'Inactive'}
+                          </Badge>
+                          <Switch
+                            checked={kitchen.isActive}
+                            onCheckedChange={() => handleToggleKitchenStatus(kitchen.id)}
+                          />
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <Label className="text-sm font-medium text-gray-700">Username</Label>
+                          <div className="flex items-center space-x-2 mt-1">
+                            <code className="bg-gray-100 px-2 py-1 rounded text-sm">
+                              {kitchen.username}
+                            </code>
+                          </div>
+                        </div>
+
+                        <div>
+                          <Label className="text-sm font-medium text-gray-700">Password</Label>
+                          <div className="flex items-center space-x-2 mt-1">
+                            <code className="bg-gray-100 px-2 py-1 rounded text-sm flex-1">
+                              {passwordVisible[kitchen.id] ? kitchen.password : '••••••••'}
+                            </code>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setPasswordVisible(prev => ({ 
+                                ...prev, 
+                                [kitchen.id]: !prev[kitchen.id] 
+                              }))}
+                            >
+                              <Eye className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </div>
+
+                        {kitchen.contactNumber && (
+                          <div>
+                            <Label className="text-sm font-medium text-gray-700">Contact</Label>
+                            <p className="text-sm text-gray-900 mt-1">+91 {kitchen.contactNumber}</p>
+                          </div>
+                        )}
+
+                        <div>
+                          <Label className="text-sm font-medium text-gray-700">Created</Label>
+                          <p className="text-sm text-gray-900 mt-1">{formatDate(kitchen.createdAt)}</p>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center pt-4 border-t gap-3 sm:gap-0">
+                        <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleCopyCredentials(kitchen)}
+                            className="w-full sm:w-auto text-xs"
+                          >
+                            {copySuccess[kitchen.id] ? (
+                              <CheckCircle2 className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2 text-green-600" />
+                            ) : (
+                              <Copy className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                            )}
+                            Copy Credentials
+                          </Button>
+                          <Button variant="outline" size="sm" asChild className="w-full sm:w-auto text-xs">
+                            <Link to="/kitchen">
+                              <ChefHat className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                              Open Kitchen
+                            </Link>
+                          </Button>
+                        </div>
+                        
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700 w-full sm:w-auto text-xs">
+                              <Trash2 className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                              Delete
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete Kitchen Account</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Are you sure you want to delete the kitchen account "{kitchen.kitchenName}"? 
+                                This action cannot be undone.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => handleDeleteKitchen(kitchen.id)}
+                                className="bg-red-600 hover:bg-red-700"
+                              >
+                                Delete Account
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))
+              )}
+            </div>
+          </TabsContent>
+
+          {/* Customer View Tab */}
+          <TabsContent value="customer-view" className="space-y-6">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div>
+                <h2 className="text-xl sm:text-2xl font-bold">Customer View Preview</h2>
+                <p className="text-gray-600 text-sm sm:text-base">See exactly what your customers see when they scan QR codes</p>
+              </div>
+              <Button asChild className="w-full sm:w-auto">
+                <Link to="/?table=preview" target="_blank">
+                  <ExternalLink className="h-4 w-4 mr-2" />
+                  Open Customer View
+                </Link>
+              </Button>
+            </div>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <UtensilsCrossed className="h-5 w-5" />
+                  <span>Customer Experience Preview</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-lg">
+                  <h3 className="text-lg font-semibold mb-4">What customers see:</h3>
+                  <div className="space-y-3">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                        <span className="text-blue-600 font-bold text-sm">1</span>
+                      </div>
+                      <p className="text-gray-700">Scan QR code at their table</p>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                        <span className="text-blue-600 font-bold text-sm">2</span>
+                      </div>
+                      <p className="text-gray-700">Browse your menu with categories and filters</p>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                        <span className="text-blue-600 font-bold text-sm">3</span>
+                      </div>
+                      <p className="text-gray-700">Add items to cart and customize orders</p>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                        <span className="text-blue-600 font-bold text-sm">4</span>
+                      </div>
+                      <p className="text-gray-700">Choose payment method and place order</p>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                        <span className="text-blue-600 font-bold text-sm">5</span>
+                      </div>
+                      <p className="text-gray-700">Track order status in real-time</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <Card className={`border-2 transition-colors ${menu.length > 0 ? 'border-green-200 bg-green-50' : 'border-dashed border-gray-200'}`}>
+                    <CardContent className="p-4 text-center">
+                      <Package className={`h-8 w-8 mx-auto mb-2 ${menu.length > 0 ? 'text-green-600' : 'text-gray-400'}`} />
+                      <h4 className="font-medium text-gray-900">Menu Items</h4>
+                      <p className="text-sm text-gray-600 mt-1">
+                        {menu.length} items, {menu.filter(item => item.available).length} available
+                      </p>
+                      <Button variant="outline" size="sm" className="mt-3" onClick={() => setActiveTab('menu')}>
+                        {menu.length > 0 ? 'Manage Menu' : 'Add Items'}
+                      </Button>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="border-2 border-dashed border-gray-200">
+                    <CardContent className="p-4 text-center">
+                      <QrCode className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                      <h4 className="font-medium text-gray-900">QR Codes</h4>
+                      <p className="text-sm text-gray-600 mt-1">Generate table QR codes</p>
+                      <Button variant="outline" size="sm" className="mt-3" onClick={() => setActiveTab('qr-codes')}>
+                        Generate QR
+                      </Button>
+                    </CardContent>
+                  </Card>
+
+                  <Card className={`border-2 transition-colors ${kitchenAccounts.filter(k => k.isActive).length > 0 ? 'border-green-200 bg-green-50' : 'border-dashed border-gray-200'}`}>
+                    <CardContent className="p-4 text-center">
+                      <ChefHat className={`h-8 w-8 mx-auto mb-2 ${kitchenAccounts.filter(k => k.isActive).length > 0 ? 'text-green-600' : 'text-gray-400'}`} />
+                      <h4 className="font-medium text-gray-900">Kitchen Ready</h4>
+                      <p className="text-sm text-gray-600 mt-1">
+                        {kitchenAccounts.filter(k => k.isActive).length} active of {kitchenAccounts.length} total
+                      </p>
+                      <Button variant="outline" size="sm" className="mt-3" onClick={() => setActiveTab('kitchen-mgmt')}>
+                        Manage Kitchen
+                      </Button>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                <div className="bg-amber-50 border border-amber-200 p-4 rounded-lg">
+                  <div className="flex items-start space-x-3">
+                    <Bell className="h-5 w-5 text-amber-600 mt-0.5" />
+                    <div>
+                      <h4 className="font-medium text-amber-900">Getting Started</h4>
+                      <p className="text-amber-700 text-sm mt-1">
+                        To enable customer ordering, make sure you have:
+                      </p>
+                      <ul className="text-amber-700 text-sm mt-2 space-y-1">
+                        <li>• Added menu items with prices</li>
+                        <li>• Generated QR codes for tables</li>
+                        <li>• Set up kitchen accounts for order management</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* QR Codes Tab */}
+          <TabsContent value="qr-codes" className="space-y-4 sm:space-y-6">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div>
+                <h2 className="text-xl sm:text-2xl font-bold">QR Code Management</h2>
+                <p className="text-gray-600 text-sm sm:text-base">Generate QR codes for your restaurant tables</p>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                <Input
+                  placeholder="Table number (e.g., T1, Table-01)"
+                  value={newTableNumber}
+                  onChange={(e) => setNewTableNumber(e.target.value)}
+                  className="w-full sm:w-48"
+                  onKeyPress={(e) => e.key === 'Enter' && handleAddTable()}
+                />
+                <Button onClick={handleAddTable} className="w-full sm:w-auto">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Table
+                </Button>
+              </div>
+            </div>
+
+            {tableNumbers.length === 0 ? (
+              <Card>
+                <CardContent className="py-12 text-center">
+                  <QrCode className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">No QR Codes Yet</h3>
+                  <p className="text-gray-600 mb-6">Add your first table to generate QR codes for contactless ordering.</p>
+                  <div className="flex flex-col sm:flex-row gap-2 max-w-md mx-auto">
+                    <Input
+                      placeholder="Enter table number"
+                      value={newTableNumber}
+                      onChange={(e) => setNewTableNumber(e.target.value)}
+                      onKeyPress={(e) => e.key === 'Enter' && handleAddTable()}
+                    />
+                    <Button onClick={handleAddTable}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Table
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
+                {tableNumbers.map((tableNumber) => (
+                  <Card key={tableNumber} className="overflow-hidden hover:shadow-md transition-shadow">
+                    <CardContent className="p-4">
+                      <div className="space-y-4">
+                        <div className="text-center">
+                          <h3 className="font-semibold text-lg">Table {tableNumber}</h3>
+                          <p className="text-sm text-gray-600">Scan to order</p>
+                        </div>
+                        
+                        <div className="flex justify-center">
+                          <div className="bg-white p-2 rounded-lg border">
+                            <img
+                              src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(generateQRCodeURL(tableNumber))}`}
+                              alt={`QR Code for Table ${tableNumber}`}
+                              className="w-30 h-30"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="w-full text-xs"
+                            onClick={() => handleDownloadQR(tableNumber)}
+                          >
+                            <Download className="h-3 w-3 mr-1" />
+                            Download QR
+                          </Button>
+                          
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="w-full text-xs"
+                            onClick={() => {
+                              navigator.clipboard.writeText(generateQRCodeURL(tableNumber));
+                              toast({
+                                title: "Success",
+                                description: "Table URL copied to clipboard!",
+                              });
+                            }}
+                          >
+                            <Copy className="h-3 w-3 mr-1" />
+                            Copy URL
+                          </Button>
+
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="w-full text-xs text-red-600 hover:text-red-700"
+                            onClick={() => handleRemoveTable(tableNumber)}
+                          >
+                            <Trash2 className="h-3 w-3 mr-1" />
+                            Remove
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </TabsContent>
+
+          {/* Menu Tab */}
+          <TabsContent value="menu" className="space-y-4 sm:space-y-6">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div>
+                <h2 className="text-xl sm:text-2xl font-bold">Menu Management</h2>
+                <p className="text-gray-600 text-sm sm:text-base">Manage your restaurant's menu items</p>
+              </div>
+              <Button onClick={() => setShowAddMenuModal(true)} className="w-full sm:w-auto">
+                <Plus className="h-4 w-4 mr-2" />
+                Add Menu Item
+              </Button>
+            </div>
+
+            {menu.length === 0 ? (
+              <Card>
+                <CardContent className="py-12 text-center">
+                  <Package className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">No Menu Items</h3>
+                  <p className="text-gray-600 mb-6">Add your first menu item to start accepting orders.</p>
+                  <Button onClick={() => setShowAddMenuModal(true)}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Menu Item
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
+                {menu.map((item) => (
+                  <Card key={item.id} className="overflow-hidden hover:shadow-md transition-shadow">
+                    <div className="aspect-video bg-gray-100 relative">
+                      <img 
+                        src={item.image} 
+                        alt={item.name}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          e.currentTarget.src = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c';
+                        }}
+                      />
+                      <Badge 
+                        variant={item.available ? "default" : "secondary"}
+                        className="absolute top-2 right-2"
+                      >
+                        {item.available ? 'Available' : 'Unavailable'}
+                      </Badge>
+                    </div>
+                    <CardContent className="p-4">
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-start">
+                          <h3 className="font-semibold text-sm sm:text-base line-clamp-1">{item.name}</h3>
+                          <span className="text-lg font-bold text-green-600">₹{item.price}</span>
+                        </div>
+                        <Badge variant="outline" className="text-xs">
+                          {item.category}
+                        </Badge>
+                        {item.description && (
+                          <p className="text-xs sm:text-sm text-gray-600 line-clamp-2">
+                            {item.description}
+                          </p>
+                        )}
+                        <div className="flex gap-2 pt-2">
+                          <Button variant="outline" size="sm" className="flex-1 text-xs">
+                            <Edit className="h-3 w-3 mr-1" />
+                            Edit
+                          </Button>
+                          <Button variant="outline" size="sm" className="flex-1 text-xs text-red-600">
+                            <Trash2 className="h-3 w-3 mr-1" />
+                            Delete
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
               </div>
             )}
 
-            {/* Edit Item Dialog */}
-            <Dialog open={!!editingItem} onOpenChange={(open) => !open && setEditingItem(null)}>
-              <DialogContent className="max-w-2xl">
-                <DialogHeader>
-                  <DialogTitle>Edit Menu Item</DialogTitle>
-                </DialogHeader>
-                {editingItem && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-4">
-                      <div className="space-y-2">
-                        <Label>Name *</Label>
-                        <Input
-                          value={editForm.name}
-                          onChange={(e) =>
-                            setEditForm({ ...editForm, name: e.target.value })
-                          }
-                          placeholder="Item name"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Description</Label>
-                        <Textarea
-                          value={editForm.description}
-                          onChange={(e) =>
-                            setEditForm({ ...editForm, description: e.target.value })
-                          }
-                          placeholder="Item description"
-                          className="min-h-[100px]"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Price *</Label>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          value={editForm.price}
-                          onChange={(e) =>
-                            setEditForm({ ...editForm, price: e.target.value })
-                          }
-                          placeholder="0.00"
-                        />
-                      </div>
-                    </div>
-                    <div className="space-y-4">
-                      <div className="space-y-2">
-                        <Label>Category *</Label>
-                        <Select
-                          value={editForm.category}
-                          onValueChange={(value) =>
-                            setEditForm({ ...editForm, category: value })
-                          }
-                        >
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {categories.map((category) => (
-                              <SelectItem key={category} value={category}>
-                                {category}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <Input
-                          value={editForm.category}
-                          onChange={(e) =>
-                            setEditForm({ ...editForm, category: e.target.value })
-                          }
-                          placeholder="Or type new category"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Image URL</Label>
-                        <Input
-                          value={editForm.image}
-                          onChange={(e) =>
-                            setEditForm({ ...editForm, image: e.target.value })
-                          }
-                          placeholder="https://..."
-                        />
-                        {editForm.image && (
-                          <div className="aspect-video w-full max-w-48 overflow-hidden rounded border">
-                            <img
-                              src={editForm.image}
-                              alt="Preview"
-                              className="w-full h-full object-cover"
-                            />
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Switch
-                          id="edit-available"
-                          checked={editForm.available}
-                          onCheckedChange={(checked) =>
-                            setEditForm({ ...editForm, available: checked })
-                          }
-                        />
-                        <Label htmlFor="edit-available">Available</Label>
-                      </div>
-                    </div>
-                  </div>
-                )}
-                <div className="flex gap-2 mt-6">
-                  <Button onClick={handleUpdateItem} className="flex-1">
-                    <Save className="h-4 w-4 mr-2" />
-                    Update Item
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => setEditingItem(null)}
-                  >
-                    <X className="h-4 w-4 mr-2" />
-                    Cancel
+            {/* Add Menu Modal */}
+            <AddMenuModal 
+              isOpen={showAddMenuModal}
+              onClose={() => setShowAddMenuModal(false)}
+              onSuccess={() => {
+                setShowAddMenuModal(false);
+                toast({
+                  title: "Success",
+                  description: "Menu item added successfully!",
+                });
+              }}
+            />
+          </TabsContent>
+
+          {/* Analytics Tab */}
+          <TabsContent value="analytics" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Analytics & Reports</CardTitle>
+                <p className="text-sm text-gray-600">
+                  Track your restaurant's performance and customer insights
+                </p>
+              </CardHeader>
+              <CardContent>
+                <div className="text-center py-12">
+                  <BarChart3 className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">Analytics Coming Soon</h3>
+                  <p className="text-gray-600 mb-6">Start receiving orders to see detailed analytics and reports.</p>
+                  <Button variant="outline">
+                    <Download className="h-4 w-4 mr-2" />
+                    Export Report
                   </Button>
                 </div>
-              </DialogContent>
-            </Dialog>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Settings Tab */}
+          <TabsContent value="settings" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Account Settings</CardTitle>
+                <p className="text-sm text-gray-600">
+                  Manage your account preferences and security settings
+                </p>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-6">
+                  <div className="flex items-center justify-between p-4 border rounded-lg">
+                    <div className="flex items-center space-x-3">
+                      <Bell className="h-5 w-5 text-gray-500" />
+                      <div>
+                        <h4 className="font-medium">Email Notifications</h4>
+                        <p className="text-sm text-gray-600">Receive notifications about orders and updates</p>
+                      </div>
+                    </div>
+                    <Button variant="outline" size="sm">Configure</Button>
+                  </div>
+
+                  <div className="flex items-center justify-between p-4 border rounded-lg">
+                    <div className="flex items-center space-x-3">
+                      <Shield className="h-5 w-5 text-gray-500" />
+                      <div>
+                        <h4 className="font-medium">Security Settings</h4>
+                        <p className="text-sm text-gray-600">Change password and security preferences</p>
+                      </div>
+                    </div>
+                    <Button variant="outline" size="sm">Manage</Button>
+                  </div>
+
+                  <div className="flex items-center justify-between p-4 border rounded-lg">
+                    <div className="flex items-center space-x-3">
+                      <CreditCard className="h-5 w-5 text-gray-500" />
+                      <div>
+                        <h4 className="font-medium">Billing & Subscription</h4>
+                        <p className="text-sm text-gray-600">Manage your subscription and payment methods</p>
+                      </div>
+                    </div>
+                    <Button variant="outline" size="sm">
+                      <Eye className="h-4 w-4 mr-2" />
+                      View
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
       </main>

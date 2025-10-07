@@ -1,64 +1,75 @@
 const jwt = require('jsonwebtoken');
 const Restaurant = require('../models/Restaurant');
+const Kitchen = require('../models/Kitchen');
 
 const authMiddleware = async (req, res, next) => {
   try {
-    // Get token from header
-    const authHeader = req.header('Authorization');
-    
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    const token = req.header('Authorization')?.replace('Bearer ', '');
+
+    if (!token) {
       return res.status(401).json({
         success: false,
-        message: 'No token provided or invalid format'
+        message: 'No token provided, authorization denied'
       });
     }
 
-    const token = authHeader.substring(7); // Remove 'Bearer ' prefix
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fastasflash_secret_key_2024');
 
-    // Verify token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    
-    // Find restaurant by ID (using Mongoose)
-    const restaurant = await Restaurant.findById(decoded.id).select('-hashedPassword');
-    
-    if (!restaurant) {
+    let user;
+    if (decoded.role === 'admin') {
+      user = await Restaurant.findOne({ restaurantId: decoded.userId });
+      req.restaurantId = decoded.userId;
+    } else if (decoded.role === 'kitchen') {
+      user = await Kitchen.findOne({ username: decoded.userId });
+      req.restaurantId = user?.restaurantId;
+      req.kitchenId = user?._id;
+    }
+
+    if (!user) {
       return res.status(401).json({
         success: false,
-        message: 'Restaurant not found'
+        message: 'Token is not valid'
       });
     }
 
-    if (!restaurant.isActive) {
+    if (!user.isActive) {
       return res.status(401).json({
         success: false,
-        message: 'Account is deactivated'
+        message: 'Account has been deactivated'
       });
     }
 
-    // Add restaurant to request object
-    req.restaurant = restaurant;
+    req.user = user;
+    req.role = decoded.role;
     next();
-  } catch (error) {
-    if (error.name === 'JsonWebTokenError') {
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid token'
-      });
-    }
-    
-    if (error.name === 'TokenExpiredError') {
-      return res.status(401).json({
-        success: false,
-        message: 'Token expired'
-      });
-    }
 
+  } catch (error) {
     console.error('Auth middleware error:', error);
-    res.status(500).json({
+    res.status(401).json({
       success: false,
-      message: 'Server error during authentication'
+      message: 'Token is not valid'
     });
   }
 };
 
-module.exports = authMiddleware;
+const adminOnly = (req, res, next) => {
+  if (req.role !== 'admin') {
+    return res.status(403).json({
+      success: false,
+      message: 'Access denied. Admin privileges required.'
+    });
+  }
+  next();
+};
+
+const kitchenOnly = (req, res, next) => {
+  if (req.role !== 'kitchen') {
+    return res.status(403).json({
+      success: false,
+      message: 'Access denied. Kitchen privileges required.'
+    });
+  }
+  next();
+};
+
+module.exports = { authMiddleware, adminOnly, kitchenOnly };
