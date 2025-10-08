@@ -4,7 +4,7 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 8080;
 
 // Enhanced CORS configuration
 app.use(cors({
@@ -120,20 +120,28 @@ server.on('error', (err) => {
 // Graceful shutdown
 process.on('SIGINT', () => {
   console.log('\n⏹️  Shutting down server...');
-  server.close(() => {
-    mongoose.connection.close(() => {
+  server.close(async () => {
+    try {
+      await mongoose.connection.close();
       console.log('📴 MongoDB connection closed');
       process.exit(0);
-    });
+    } catch (error) {
+      console.error('❌ Error closing MongoDB connection:', error);
+      process.exit(1);
+    }
   });
 });
 
 process.on('SIGTERM', () => {
   console.log('⏹️  Received SIGTERM. Shutting down gracefully...');
-  server.close(() => {
-    mongoose.connection.close(() => {
+  server.close(async () => {
+    try {
+      await mongoose.connection.close();
       console.log('📴 MongoDB connection closed');
       process.exit(0);
-    });
+    } catch (error) {
+      console.error('❌ Error closing MongoDB connection:', error);
+      process.exit(1);
+    }
   });
 });
