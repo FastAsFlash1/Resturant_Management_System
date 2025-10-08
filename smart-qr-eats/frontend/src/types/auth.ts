@@ -19,6 +19,7 @@ export interface KitchenUser {
   username: string;
   kitchenName: string;
   restaurantId: string;
+  contactNumber?: string;
   isActive: boolean;
   role: 'kitchen';
   createdAt: string;

@@ -140,6 +140,95 @@ class ApiService {
     });
   }
 
+  // Menu endpoints
+  async getMenu(restaurantId?: string): Promise<ApiResponse> {
+    const endpoint = restaurantId ? `/menu/public/${restaurantId}` : '/menu';
+    return this.makeRequest(endpoint, {
+      method: 'GET',
+      headers: restaurantId ? {} : this.getAuthHeaders(),
+    });
+  }
+
+  async addMenuItem(data: {
+    name: string;
+    description?: string;
+    price: number;
+    category: string;
+    imageUrl?: string;
+  }): Promise<ApiResponse> {
+    return this.makeRequest('/menu', {
+      method: 'POST',
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateMenuItem(id: string, data: {
+    name?: string;
+    description?: string;
+    price?: number;
+    category?: string;
+    imageUrl?: string;
+    isActive?: boolean;
+  }): Promise<ApiResponse> {
+    return this.makeRequest(`/menu/${id}`, {
+      method: 'PUT',
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteMenuItem(id: string): Promise<ApiResponse> {
+    return this.makeRequest(`/menu/${id}`, {
+      method: 'DELETE',
+      headers: this.getAuthHeaders(),
+    });
+  }
+
+  // Order endpoints
+  async placeOrder(data: {
+    restaurantId: string;
+    tableId: string;
+    items: Array<{
+      menuItemId: string;
+      quantity: number;
+      customization?: any;
+    }>;
+    paymentType: string;
+    customerInfo?: any;
+    notes?: string;
+  }): Promise<ApiResponse> {
+    return this.makeRequest('/orders', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getOrders(params?: {
+    status?: string;
+    tableId?: string;
+    limit?: number;
+  }): Promise<ApiResponse> {
+    const queryParams = new URLSearchParams();
+    if (params?.status) queryParams.append('status', params.status);
+    if (params?.tableId) queryParams.append('tableId', params.tableId);
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+    
+    const endpoint = `/orders${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+    return this.makeRequest(endpoint, {
+      method: 'GET',
+      headers: this.getAuthHeaders(),
+    });
+  }
+
+  async updateOrderStatus(orderId: string, status: string, assignedTo?: string): Promise<ApiResponse> {
+    return this.makeRequest(`/orders/${orderId}/status`, {
+      method: 'PUT',
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify({ status, assignedTo }),
+    });
+  }
+
   // Health check
   async healthCheck(): Promise<ApiResponse> {
     return this.makeRequest('/health');

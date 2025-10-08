@@ -1,13 +1,22 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { apiService } from '@/services/api';
+import { useAuth } from './AuthContext';
+import { toast } from '@/hooks/use-toast';
 
 export interface MenuItem {
-  id: string;
+  _id?: string;
+  id?: string;
   name: string;
-  description: string;
+  description?: string;
   price: number;
   category: string;
-  image: string;
-  available: boolean;
+  image?: string;
+  imageUrl?: string;
+  available?: boolean;
+  isActive?: boolean;
+  restaurantId?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface PortionSize {
@@ -45,15 +54,18 @@ interface RestaurantContextType {
   menu: MenuItem[];
   orders: Order[];
   cart: CartItem[];
+  loading: boolean;
   addToCart: (item: MenuItem, customization?: MenuItemCustomization) => void;
   removeFromCart: (cartIndex: number) => void;
   updateQuantity: (cartIndex: number, quantity: number) => void;
   clearCart: () => void;
   placeOrder: (tableId: string, paymentType: Order['paymentType']) => void;
   updateOrderStatus: (orderId: string, status: Order['status']) => void;
-  addMenuItem: (item: Omit<MenuItem, 'id'>) => void;
-  updateMenuItem: (id: string, item: Partial<MenuItem>) => void;
-  deleteMenuItem: (id: string) => void;
+  addMenuItem: (item: Omit<MenuItem, 'id' | '_id'>) => Promise<{ success: boolean; data?: MenuItem; error?: string }>;
+  updateMenuItem: (id: string, item: Partial<MenuItem>) => Promise<{ success: boolean; error?: string }>;
+  deleteMenuItem: (id: string) => Promise<{ success: boolean; error?: string }>;
+  loadMenu: () => Promise<void>;
+  loadOrders: () => Promise<void>;
 }
 
 const RestaurantContext = createContext<RestaurantContextType | undefined>(undefined);
@@ -143,9 +155,76 @@ const DUMMY_ORDERS: Order[] = [
 ];
 
 export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [menu, setMenu] = useState<MenuItem[]>(DUMMY_MENU);
-  const [orders, setOrders] = useState<Order[]>(DUMMY_ORDERS);
+  const { user, isAuthenticated } = useAuth();
+  const [menu, setMenu] = useState<MenuItem[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  // Load menu data when component mounts or when user changes
+  useEffect(() => {
+    loadMenu();
+    if (isAuthenticated) {
+      loadOrders();
+    }
+  }, [user, isAuthenticated]);
+
+  const loadMenu = async () => {
+    try {
+      setLoading(true);
+      console.log('🔵 Loading menu for restaurant:', user?.restaurantId);
+      
+      const response = user?.restaurantId 
+        ? await apiService.getMenu(user.restaurantId)
+        : await apiService.getMenu();
+      
+      if (response.success && response.data) {
+        const menuItems = response.data.map((item: any) => ({
+          id: item._id || item.id,
+          _id: item._id,
+          name: item.name,
+          description: item.description || '',
+          price: item.price,
+          category: item.category,
+          image: item.imageUrl || item.image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c',
+          available: item.isActive !== undefined ? item.isActive : item.available,
+          isActive: item.isActive,
+          restaurantId: item.restaurantId,
+          createdAt: item.createdAt,
+          updatedAt: item.updatedAt
+        }));
+        
+        console.log('🟢 Menu loaded successfully:', menuItems.length, 'items');
+        setMenu(menuItems);
+      } else {
+        console.log('🟡 No menu items found, using empty menu');
+        setMenu([]);
+      }
+    } catch (error) {
+      console.error('🔴 Error loading menu:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load menu items",
+        variant: "destructive"
+      });
+      setMenu([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadOrders = async () => {
+    try {
+      const response = await apiService.getOrders();
+      if (response.success && response.data) {
+        console.log('🟢 Orders loaded successfully:', response.data.length, 'orders');
+        setOrders(response.data);
+      }
+    } catch (error) {
+      console.error('🔴 Error loading orders:', error);
+      setOrders([]);
+    }
+  };
 
   const addToCart = (item: MenuItem, customization?: MenuItemCustomization) => {
     setCart((prev) => {
@@ -216,22 +295,136 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     );
   };
 
-  const addMenuItem = (item: Omit<MenuItem, 'id'>) => {
-    const newItem: MenuItem = {
-      ...item,
-      id: `item-${Date.now()}`,
-    };
-    setMenu((prev) => [...prev, newItem]);
+  const addMenuItem = async (item: Omit<MenuItem, 'id' | '_id'>) => {
+    try {
+      console.log('🔵 Adding menu item:', item);
+      
+      const response = await apiService.addMenuItem({
+        name: item.name,
+        description: item.description || '',
+        price: item.price,
+        category: item.category,
+        imageUrl: item.image || item.imageUrl || ''
+      });
+
+      if (response.success && response.data) {
+        const newItem: MenuItem = {
+          id: response.data._id,
+          _id: response.data._id,
+          name: response.data.name,
+          description: response.data.description || '',
+          price: response.data.price,
+          category: response.data.category,
+          image: response.data.imageUrl || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c',
+          available: response.data.isActive,
+          isActive: response.data.isActive,
+          restaurantId: response.data.restaurantId,
+          createdAt: response.data.createdAt,
+          updatedAt: response.data.updatedAt
+        };
+
+        setMenu((prev) => [...prev, newItem]);
+        console.log('🟢 Menu item added successfully');
+        
+        toast({
+          title: "Success",
+          description: "Menu item added successfully!",
+        });
+
+        return { success: true, data: newItem };
+      } else {
+        throw new Error(response.message || 'Failed to add menu item');
+      }
+    } catch (error: any) {
+      console.error('🔴 Error adding menu item:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to add menu item",
+        variant: "destructive"
+      });
+      return { success: false, error: error.message };
+    }
   };
 
-  const updateMenuItem = (id: string, item: Partial<MenuItem>) => {
-    setMenu((prev) =>
-      prev.map((menuItem) => (menuItem.id === id ? { ...menuItem, ...item } : menuItem))
-    );
+  const updateMenuItem = async (id: string, item: Partial<MenuItem>) => {
+    try {
+      console.log('🔵 Updating menu item:', id, item);
+      
+      const response = await apiService.updateMenuItem(id, {
+        name: item.name,
+        description: item.description,
+        price: item.price,
+        category: item.category,
+        imageUrl: item.image || item.imageUrl,
+        isActive: item.available !== undefined ? item.available : item.isActive
+      });
+
+      if (response.success && response.data) {
+        const updatedItem = {
+          ...item,
+          id: response.data._id,
+          _id: response.data._id,
+          image: response.data.imageUrl,
+          available: response.data.isActive
+        };
+
+        setMenu((prev) =>
+          prev.map((menuItem) => 
+            (menuItem.id === id || menuItem._id === id) 
+              ? { ...menuItem, ...updatedItem } 
+              : menuItem
+          )
+        );
+
+        console.log('🟢 Menu item updated successfully');
+        toast({
+          title: "Success",
+          description: "Menu item updated successfully!",
+        });
+
+        return { success: true };
+      } else {
+        throw new Error(response.message || 'Failed to update menu item');
+      }
+    } catch (error: any) {
+      console.error('🔴 Error updating menu item:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update menu item",
+        variant: "destructive"
+      });
+      return { success: false, error: error.message };
+    }
   };
 
-  const deleteMenuItem = (id: string) => {
-    setMenu((prev) => prev.filter((item) => item.id !== id));
+  const deleteMenuItem = async (id: string) => {
+    try {
+      console.log('🔵 Deleting menu item:', id);
+      
+      const response = await apiService.deleteMenuItem(id);
+
+      if (response.success) {
+        setMenu((prev) => prev.filter((item) => item.id !== id && item._id !== id));
+        
+        console.log('🟢 Menu item deleted successfully');
+        toast({
+          title: "Success",
+          description: "Menu item deleted successfully!",
+        });
+
+        return { success: true };
+      } else {
+        throw new Error(response.message || 'Failed to delete menu item');
+      }
+    } catch (error: any) {
+      console.error('🔴 Error deleting menu item:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete menu item",
+        variant: "destructive"
+      });
+      return { success: false, error: error.message };
+    }
   };
 
   return (
@@ -240,6 +433,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         menu,
         orders,
         cart,
+        loading,
         addToCart,
         removeFromCart,
         updateQuantity,
@@ -249,6 +443,8 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         addMenuItem,
         updateMenuItem,
         deleteMenuItem,
+        loadMenu,
+        loadOrders,
       }}
     >
       {children}

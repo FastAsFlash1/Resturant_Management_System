@@ -26,7 +26,7 @@ import { useRestaurant } from '@/contexts/RestaurantContext';
 interface AddMenuModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess?: () => void;
+  onSuccess?: (menuItem: any) => void;
 }
 
 export const AddMenuModal: React.FC<AddMenuModalProps> = ({ isOpen, onClose, onSuccess }) => {
@@ -55,7 +55,7 @@ export const AddMenuModal: React.FC<AddMenuModalProps> = ({ isOpen, onClose, onS
     setIsLoading(true);
     
     try {
-      addMenuItem({
+      const result = await addMenuItem({
         name: formData.name,
         description: formData.description,
         price: parseFloat(formData.price),
@@ -64,22 +64,24 @@ export const AddMenuModal: React.FC<AddMenuModalProps> = ({ isOpen, onClose, onS
         available: formData.available,
       });
 
-      toast.success('Menu item added successfully!');
-      
-      // Reset form
-      setFormData({
-        name: '',
-        description: '',
-        price: '',
-        category: '',
-        image: '',
-        available: true,
-      });
-      
-      onSuccess?.();
-      onClose();
-    } catch (err) {
-      setError('Failed to add menu item. Please try again.');
+      if (result.success) {
+        // Reset form
+        setFormData({
+          name: '',
+          description: '',
+          price: '',
+          category: '',
+          image: '',
+          available: true,
+        });
+        
+        onSuccess?.(result.data);
+        onClose();
+      } else {
+        setError(result.error || 'Failed to add menu item. Please try again.');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to add menu item. Please try again.');
     } finally {
       setIsLoading(false);
     }

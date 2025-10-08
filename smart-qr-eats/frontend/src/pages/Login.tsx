@@ -152,11 +152,11 @@ const Login: React.FC = () => {
               <div className="text-xs text-gray-500 space-y-1">
                 <div className="flex items-center space-x-2">
                   <IdCard className="h-3 w-3" />
-                  <span>Admin: Restaurant ID (RID123456) or Phone (10 digits)</span>
+                  <span>Admin: Use your Restaurant ID or registered phone number</span>
                 </div>
                 <div className="flex items-center space-x-2">
                   <User className="h-3 w-3" />
-                  <span>Kitchen: Username provided by admin</span>
+                  <span>Kitchen: Use username created by restaurant admin</span>
                 </div>
               </div>
             </div>

@@ -14,7 +14,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [role, setRole] = useState<'admin' | 'kitchen' | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Check for existing auth on app load
+  
   useEffect(() => {
     console.log('🔵 AuthProvider: Initializing...');
     const storedToken = localStorage.getItem('authToken');
@@ -66,74 +66,64 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setLoading(true);
       console.log('🔵 AuthContext: Login attempt with:', credentials.identifier);
       
-      // Try API first, fallback to mock for demo
-      try {
-        const response = await apiService.login(credentials);
+      const response = await apiService.login(credentials);
+      console.log('🔵 API Response:', response);
+      
+      if (response.success && response.data) {
+        const { token: authToken, role, restaurant, kitchen } = response.data;
+        console.log('🔵 Response data:', { token: !!authToken, role, hasRestaurant: !!restaurant, hasKitchen: !!kitchen });
         
-        if (response.success && response.data) {
-          const { user: userData, token: authToken } = response.data;
-          const userRole = userData.role || 'admin';
-          
-          login(userData, authToken, userRole);
-          return { success: true, message: response.message || 'Login successful' };
+        if (authToken && role) {
+          // Transform backend data to frontend format
+          if (role === 'admin' && restaurant) {
+            const adminUser: User = {
+              id: restaurant.restaurantId,
+              restaurantId: restaurant.restaurantId,
+              restaurantName: restaurant.restaurantName,
+              ownerName: restaurant.ownerName,
+              phoneNumber: restaurant.phoneNumber,
+              location: restaurant.location,
+              establishmentYear: restaurant.establishmentYear,
+              isActive: restaurant.isActive,
+              planAmount: restaurant.planAmount || 0,
+              selectedServices: restaurant.selectedServices || [],
+              createdAt: restaurant.createdAt || new Date().toISOString(),
+              lastLogin: restaurant.lastLogin || new Date().toISOString(),
+              role: 'admin'
+            };
+            login(adminUser, authToken, role);
+            return { success: true, message: response.message || 'Admin login successful' };
+          } else if (role === 'kitchen' && kitchen) {
+            const kitchenUser: KitchenUser = {
+              id: kitchen.id,
+              username: kitchen.username,
+              kitchenName: kitchen.kitchenName,
+              restaurantId: kitchen.restaurantId,
+              contactNumber: kitchen.contactNumber,
+              isActive: kitchen.isActive,
+              role: 'kitchen',
+              createdAt: kitchen.createdAt || new Date().toISOString(),
+              lastLogin: kitchen.lastLogin || new Date().toISOString()
+            };
+            login(kitchenUser, authToken, role);
+            return { success: true, message: response.message || 'Kitchen login successful' };
+          } else {
+            throw new Error('Invalid user data received from server');
+          }
         } else {
-          throw new Error(response.message || 'Login failed');
+          throw new Error('Missing token or role in server response');
         }
-      } catch (apiError) {
-        console.log('🟡 API failed, using mock login for demo:', apiError);
-        
-        // Mock login for demo purposes
-        const { identifier, password } = credentials;
-        
-        // Mock admin login
-        if ((identifier === 'admin' || identifier.includes('RID') || /^[0-9]{10}$/.test(identifier)) && password === 'admin123') {
-          const mockAdminUser: User = {
-            id: 'admin_001',
-            restaurantId: 'RID123456',
-            restaurantName: 'FastAsFlash Demo Restaurant',
-            ownerName: 'Demo Owner',
-            phoneNumber: '9876543210',
-            location: 'Demo City, Demo State',
-            establishmentYear: 2023,
-            isActive: true,
-            planAmount: 15000,
-            selectedServices: ['basic-menu', 'advanced-pos', 'analytics'],
-            createdAt: new Date().toISOString(),
-            lastLogin: new Date().toISOString(),
-            role: 'admin'
-          };
-          
-          login(mockAdminUser, 'mock_admin_token', 'admin');
-          return { success: true, message: 'Mock admin login successful' };
-        }
-        
-        // Mock kitchen login
-        if (identifier.includes('kitchen') && password === 'kitchen123') {
-          const mockKitchenUser: KitchenUser = {
-            id: 'kitchen_001',
-            username: 'kitchen_main',
-            kitchenName: 'Main Kitchen',
-            restaurantId: 'RID123456',
-            isActive: true,
-            role: 'kitchen',
-            createdAt: new Date().toISOString(),
-            lastLogin: new Date().toISOString()
-          };
-          
-          login(mockKitchenUser, 'mock_kitchen_token', 'kitchen');
-          return { success: true, message: 'Mock kitchen login successful' };
-        }
-        
+      } else {
         return { 
           success: false, 
-          message: 'Invalid credentials. Try: admin/admin123 or kitchen_main/kitchen123' 
+          message: response.message || 'Invalid credentials. Please check your identifier and password.' 
         };
       }
     } catch (error) {
       console.error('🔴 Login error:', error);
       return { 
         success: false, 
-        message: error instanceof Error ? error.message : 'An unexpected error occurred' 
+        message: error instanceof Error ? error.message : 'Connection failed. Please check if the server is running.' 
       };
     } finally {
       setLoading(false);
